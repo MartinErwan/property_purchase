@@ -1,0 +1,11 @@
+# Données (non versionnées, cf. CLAUDE.md)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
