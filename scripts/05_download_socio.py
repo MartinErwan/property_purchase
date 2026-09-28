@@ -2,6 +2,9 @@
 
 - Filosofi 2021 par IRIS, revenus disponibles (INSEE, https://www.insee.fr/fr/statistiques/8229323).
   Millésime le plus récent trouvé ; géographie au 1er janvier 2022.
+- Filosofi 2021 par commune (INSEE, https://www.insee.fr/fr/statistiques/7756729), pour les
+  communes non découpées en IRIS. 2021 est le dernier millésime : l'INSEE a annoncé que 2022 ne
+  sera pas produit.
 - Contours IRIS édition 2022-01-01 (IGN, Géoplateforme) : même géographie que Filosofi 2021.
 - QPV génération 2024, périmètres GPKG (ANCT, data.gouv.fr, jeu
   « quartiers-prioritaires-de-la-politique-de-la-ville-qpv »).
@@ -21,6 +24,7 @@ RAW = Path(__file__).resolve().parents[1] / "data" / "raw"
 
 SOURCES = {
     "filosofi": "https://www.insee.fr/fr/statistiques/fichier/8229323/BASE_TD_FILO_IRIS_2021_DISP_CSV.zip",
+    "filosofi_communes": "https://www.insee.fr/fr/statistiques/fichier/7756729/base-cc-filosofi-2021-geo2024_csv.zip",
     "iris": (
         "https://data.geopf.fr/telechargement/download/CONTOURS-IRIS/"
         "CONTOURS-IRIS_2-1__SHP__FRA_2022-01-01/CONTOURS-IRIS_2-1__SHP__FRA_2022-01-01.7z"
