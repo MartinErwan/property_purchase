@@ -29,7 +29,7 @@ Les notebooks `notebooks/0X_*.ipynb` contrôlent chaque étape (exploration puis
 | Fichier | Usage |
 |---|---|
 | `carte.gpkg` | QGIS : couches `iris_indicateurs`, `stations`, `ventes_24m` (+ `qpv`, `qpv_tampon_300m` si disponibles), Lambert-93 |
-| `carte.html` | Carte interactive autonome (MapLibre GL intégré) : seuls les IRIS dans les filtres sont colorés (vert = bon marché → rouge = cher), tracés des lignes à leur couleur officielle IDFM avec un point par station, gares futures en points sombres, QPV hachurés, tampon de 300 m en tirets, filtres et infobulles. Seul le fond de plan (Plan IGN v2, sans clé d'API) vient d'internet |
+| `carte.html` | Carte interactive autonome (MapLibre GL intégré) : seuls les IRIS dans les filtres sont colorés (vert = bon marché → rouge = cher), tracés des lignes à leur couleur officielle IDFM avec un point par station, gares futures en points sombres, QPV hachurés, tampon de 300 m en tirets, filtres, infobulles et recherche de ville (hors ligne, zoom sur la commune). Seul le fond de plan (Plan IGN v2, sans clé d'API) vient d'internet |
 | `kepler/*.geojson`, `kepler/*.csv` | À glisser dans https://kepler.gl/demo |
 
 Colonnes principales de `iris_indicateurs` : `prix_m2_median_{ancien,vefa}_24m` et `n_ventes_*`,

@@ -62,6 +62,13 @@ def preparer() -> dict:
     couches = set(gpd.list_layers(gpkg)["name"])
 
     i = gpd.read_file(gpkg, layer="iris_indicateurs")
+
+    # Contours de communes (repère visuel et recherche) : fusion des IRIS AVANT simplification,
+    # sinon les IRIS simplifiés un à un laissent des interstices ; le tampon ±1 m bouche les microtrous.
+    communes = i.dissolve(by="code_commune", as_index=False)[["code_commune", "nom_commune", "geometry"]]
+    communes["geometry"] = communes.buffer(1).buffer(-1).boundary.simplify(SIMPLIFICATION_M)
+    communes = geojson(communes, {"nom_commune": "n", "code_commune": "c"})
+
     i["geometry"] = i.geometry.simplify(SIMPLIFICATION_M)
     for c in ("prix_m2_median_ancien_24m", "prix_m2_median_vefa_24m", "prix_m2_median_ancien_commune_24m",
               "revenu_median", "dist_station_actuelle_m", "dist_station_future_m"):
@@ -78,11 +85,6 @@ def preparer() -> dict:
         "dist_station_future_m": "df", "station_future_proche": "sf",
         "part_surface_qpv": "q", "part_surface_tampon_qpv_300m": "tq",
     })
-
-    # Contours de communes : repère visuel même sans fond de plan.
-    communes = i.dissolve(by="code_commune", as_index=False)[["code_commune", "nom_commune", "geometry"]]
-    communes["geometry"] = communes.boundary.simplify(SIMPLIFICATION_M)
-    communes = geojson(communes, {"nom_commune": "n"})
 
     # Stations : un point par station (toutes lignes regroupées). Stations actuelles regroupées par
     # zone d'arrêt IDFM (id_ref_zdc), futures par nom. Une correspondance (plusieurs lignes) est

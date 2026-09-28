@@ -39,6 +39,15 @@
   #infobulle td { padding: 1px 6px 1px 0; vertical-align: top; }
   #infobulle td:first-child { color: var(--ink-2); }
   .tag { display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 11px; background: #eef4fc; color: #184f95; }
+  #recherche { position: absolute; top: 10px; left: 10px; z-index: 6; width: min(320px, calc(100% - 70px)); }
+  #recherche input { width: 100%; padding: 9px 12px; font: inherit; border: 1px solid var(--rule); border-radius: 8px;
+    background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
+  #recherche input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+  #suggestions { list-style: none; margin: 4px 0 0; padding: 4px 0; background: #fff; border: 1px solid var(--rule);
+    border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.12); max-height: 280px; overflow-y: auto; display: none; }
+  #suggestions li { padding: 6px 12px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+  #suggestions li small { color: var(--ink-2); }
+  #suggestions li[aria-selected="true"], #suggestions li:hover { background: #eef4fc; }
   .puce { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
   @media (max-width: 760px) {
     #app { flex-direction: column; }
@@ -91,7 +100,14 @@
       de TVA à 5,5 % en accession (conditions de ressources, non vérifiées ici). Fond : Plan IGN.
     </p>
   </aside>
-  <main id="carte"><div id="infobulle"></div></main>
+  <main id="carte">
+    <div id="recherche" role="combobox" aria-expanded="false" aria-haspopup="listbox">
+      <input id="champ-recherche" type="search" placeholder="Rechercher une ville…" autocomplete="off"
+             aria-label="Rechercher une ville" aria-controls="suggestions">
+      <ul id="suggestions" role="listbox"></ul>
+    </div>
+    <div id="infobulle"></div>
+  </main>
 </div>
 
 <script>/*__MAPLIBRE_JS__*/</script>
@@ -198,6 +214,12 @@ carte.on("load", () => {
     paint: { "line-color": "#ffffff", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.3, 13, 1.2] } });
   carte.addLayer({ id: "communes", type: "line", source: "communes",
     paint: { "line-color": "#6b6a66", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.5, 13, 1.2] } });
+  // Commune trouvée par la recherche : contour souligné.
+  carte.addSource("commune-active", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  carte.addLayer({ id: "commune-active-lisere", type: "line", source: "commune-active",
+    paint: { "line-color": "#ffffff", "line-width": 6, "line-opacity": 0.9 } });
+  carte.addLayer({ id: "commune-active", type: "line", source: "commune-active",
+    paint: { "line-color": "#2a78d6", "line-width": 3 } });
 
   if (DATA.qpv) {
     carte.addSource("qpv", { type: "geojson", data: DATA.qpv });
@@ -344,6 +366,56 @@ function construireLegende() {
   item((x) => { x.strokeStyle = ENCRE; x.lineWidth = 1.4; x.setLineDash([3, 2]); x.beginPath(); x.moveTo(2, 10); x.lineTo(26, 10); x.stroke(); },
     "Limite des 300 m autour d'un QPV");
 }
+
+// ---------- Recherche de ville (hors ligne, sur les communes de la carte) ----------
+// Normalisation : sans accents ni casse, tirets et apostrophes = espaces, « st »/« ste » = saint/sainte.
+const normaliser = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+  .replace(/[-'’]/g, " ").replace(/\bste\b/g, "sainte").replace(/\bst\b/g, "saint").replace(/\s+/g, " ").trim();
+const DEPARTEMENTS = { "75": "Paris", "92": "Hauts-de-Seine", "93": "Seine-Saint-Denis", "94": "Val-de-Marne" };
+const COMMUNES = DATA.communes.features.map((f) => {
+  const pts = f.geometry.type === "LineString" ? f.geometry.coordinates : f.geometry.coordinates.flat();
+  const lng = pts.map((p) => p[0]), lat = pts.map((p) => p[1]);
+  return { nom: f.properties.n, dep: f.properties.c.slice(0, 2), cle: normaliser(f.properties.n), mots: normaliser(f.properties.n).split(" "),
+           bbox: [[Math.min(...lng), Math.min(...lat)], [Math.max(...lng), Math.max(...lat)]], feature: f };
+}).sort((a, b) => a.nom.localeCompare(b.nom, "fr", { numeric: true }));
+
+function chercher(texte) {
+  const q = normaliser(texte);
+  if (!q) return [];
+  const jetons = q.split(" ");
+  // Chaque mot tapé doit être le début d'un mot du nom (« paris 11 » → Paris 11e, « vitry » → Vitry-sur-Seine).
+  const ok = COMMUNES.filter((c) => jetons.every((j) => c.mots.some((m) => m.startsWith(j))) || c.cle.includes(q));
+  return ok.sort((a, b) => (b.cle.startsWith(q) - a.cle.startsWith(q))).slice(0, 8);
+}
+
+const champ = document.getElementById("champ-recherche"), liste = document.getElementById("suggestions");
+let resultats = [], actif = -1;
+function afficher() {
+  liste.innerHTML = resultats.map((c, k) =>
+    `<li role="option" data-k="${k}" aria-selected="${k === actif}">${c.nom}<small>${DEPARTEMENTS[c.dep] ?? c.dep}</small></li>`).join("")
+    || (champ.value.trim() ? `<li aria-disabled="true"><small>Aucune commune trouvée dans la zone</small></li>` : "");
+  const ouvert = liste.innerHTML !== "";
+  liste.style.display = ouvert ? "block" : "none";
+  document.getElementById("recherche").setAttribute("aria-expanded", ouvert);
+}
+function aller(c) {
+  champ.value = c.nom; resultats = []; actif = -1; afficher(); champ.blur();
+  carte.getSource("commune-active").setData({ type: "FeatureCollection", features: [c.feature] });
+  carte.fitBounds(c.bbox, { padding: 60, maxZoom: 14.5, duration: 900 });
+}
+champ.addEventListener("input", () => { resultats = chercher(champ.value); actif = resultats.length ? 0 : -1; afficher(); });
+champ.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown" && resultats.length) { actif = (actif + 1) % resultats.length; afficher(); e.preventDefault(); }
+  else if (e.key === "ArrowUp" && resultats.length) { actif = (actif - 1 + resultats.length) % resultats.length; afficher(); e.preventDefault(); }
+  else if (e.key === "Enter" && resultats.length) { aller(resultats[Math.max(actif, 0)]); e.preventDefault(); }
+  else if (e.key === "Escape") { resultats = []; afficher(); champ.blur(); }
+});
+liste.addEventListener("mousedown", (e) => {
+  const li = e.target.closest("li[data-k]");
+  if (li) { aller(resultats[+li.dataset.k]); e.preventDefault(); }
+});
+champ.addEventListener("blur", () => setTimeout(() => { liste.style.display = "none"; }, 100));
+champ.addEventListener("focus", () => { if (resultats.length) afficher(); });
 
 document.getElementById("periode").textContent =
   `Ventes ${DATA.periode.replace(" / ", " → ")} · IRIS 2022 · données ouvertes`;
