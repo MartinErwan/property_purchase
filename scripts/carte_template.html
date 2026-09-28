@@ -208,12 +208,21 @@ carte.on("load", () => {
   // (mais survolables pour l'infobulle).
   carte.addLayer({ id: "iris", type: "fill", source: "iris",
     paint: { "fill-color": exprCouleur(), "fill-opacity": ["case", exprSelection(), 0.72, 0] } });
-  carte.addLayer({ id: "iris-bord", type: "line", source: "iris", minzoom: 11.5,
-    paint: { "line-color": "#8c8b85", "line-width": 0.4, "line-opacity": 0.6 } });
   carte.addLayer({ id: "iris-sel", type: "line", source: "iris", filter: exprSelection(),
     paint: { "line-color": "#ffffff", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.3, 13, 1.2] } });
+  // Limites de quartier (IRIS) : apparaissent en zoomant, fines et grises.
+  carte.addLayer({ id: "iris-bord", type: "line", source: "iris", minzoom: 11,
+    paint: { "line-color": "#5c5b57", "line-width": ["interpolate", ["linear"], ["zoom"], 11, 0.3, 13, 0.8, 16, 1.4],
+             "line-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0, 12, 0.75] } });
+  // Limites de commune : trait sombre sur liseré blanc, épaississant avec le zoom.
+  const epCommune = (marge) => ["interpolate", ["linear"], ["zoom"], 9, 0.6 + marge, 12, 1.6 + marge, 15, 2.6 + marge];
+  carte.addLayer({ id: "communes-lisere", type: "line", source: "communes", minzoom: 11,
+    layout: { "line-join": "round" }, paint: { "line-color": "#ffffff", "line-width": epCommune(2), "line-opacity": 0.85 } });
   carte.addLayer({ id: "communes", type: "line", source: "communes",
-    paint: { "line-color": "#6b6a66", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.5, 13, 1.2] } });
+    layout: { "line-join": "round" }, paint: { "line-color": "#3d3c38", "line-width": epCommune(0) } });
+  // Quartier survolé : contour souligné.
+  carte.addLayer({ id: "iris-survol", type: "line", source: "iris", filter: ["==", ["get", "id"], ""],
+    paint: { "line-color": "#2a78d6", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 15, 3] } });
   // Commune trouvée par la recherche : contour souligné.
   carte.addSource("commune-active", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   carte.addLayer({ id: "commune-active-lisere", type: "line", source: "commune-active",
@@ -287,6 +296,9 @@ carte.on("mousemove", (e) => {
   const f = carte.queryRenderedFeatures(e.point, { layers: ordre })
     .sort((a, b) => ordre.indexOf(a.layer.id) - ordre.indexOf(b.layer.id))[0];
   carte.getCanvas().style.cursor = f ? "pointer" : "";
+  // Le quartier sous la souris est souligné, quel que soit l'objet survolé au-dessus.
+  const quartier = carte.queryRenderedFeatures(e.point, { layers: ["iris"] })[0];
+  carte.setFilter("iris-survol", ["==", ["get", "id"], quartier ? quartier.properties.id : ""]);
   if (!f) { bulle.style.display = "none"; return; }
   bulle.innerHTML = contenu(f);
   bulle.style.display = "block";
@@ -294,7 +306,7 @@ carte.on("mousemove", (e) => {
   bulle.style.left = `${Math.min(x, W - bulle.offsetWidth - 8)}px`;
   bulle.style.top = `${y}px`;
 });
-carte.on("mouseout", () => { bulle.style.display = "none"; });
+carte.on("mouseout", () => { bulle.style.display = "none"; carte.setFilter("iris-survol", ["==", ["get", "id"], ""]); });
 
 // ---------- Contrôles et légende ----------
 function brancherControles() {
@@ -361,6 +373,11 @@ function construireLegende() {
     "Station de correspondance");
   item((x) => { x.fillStyle = "#555555"; x.strokeStyle = ENCRE; x.lineWidth = 2.6; x.beginPath(); x.arc(14, 10, 5.5, 0, 7); x.fill(); x.stroke(); },
     "Gare ou station future (GPE, tram, RER E) — pas de tracé publié");
+  item((x) => { x.strokeStyle = "#ffffff"; x.lineWidth = 4; x.beginPath(); x.moveTo(2, 10); x.lineTo(26, 10); x.stroke();
+    x.strokeStyle = "#3d3c38"; x.lineWidth = 2; x.beginPath(); x.moveTo(2, 10); x.lineTo(26, 10); x.stroke(); },
+    "Limite de commune");
+  item((x) => { x.strokeStyle = "#5c5b57"; x.lineWidth = 0.8; x.strokeRect(3, 3, 22, 14); },
+    "Limite de quartier (IRIS), visible en zoomant ; soulignée au survol");
   item((x) => { x.fillStyle = x.createPattern(hachure(), "repeat"); x.fillRect(2, 2, 24, 16);
     x.strokeStyle = ENCRE; x.lineWidth = 1.4; x.strokeRect(2, 2, 24, 16); }, "Quartier prioritaire (QPV 2024)");
   item((x) => { x.strokeStyle = ENCRE; x.lineWidth = 1.4; x.setLineDash([3, 2]); x.beginPath(); x.moveTo(2, 10); x.lineTo(26, 10); x.stroke(); },
