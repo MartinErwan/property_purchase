@@ -1,9 +1,9 @@
-"""Export de la carte : GeoPackage pour QGIS, GeoJSON pour Kepler.gl et carte Kepler HTML autonome.
+"""Export des données de la carte : GeoPackage pour QGIS, GeoJSON/CSV pour Kepler.gl.
 
 Entrées : data/processed/{indicateurs_iris, transports, dvf_appartements}.parquet, qpv*.parquet (optionnels)
 Sorties : data/exports/carte.gpkg              (QGIS, Lambert-93, une couche par thème)
-          data/exports/kepler/*.geojson        (WGS84, à glisser dans https://kepler.gl/demo)
-          data/exports/carte_kepler.html       (carte prête à l'emploi, filtres préréglés)
+          data/exports/kepler/*.geojson|csv    (WGS84, à glisser dans https://kepler.gl/demo)
+La carte HTML interactive est produite ensuite par scripts/09_carte_html.py.
 
 Filtres (paramètres ci-dessous ou en ligne de commande) :
 - budget : prix médian au m² de l'IRIS × surface cible <= budget (ancien et VEFA séparément,
@@ -15,7 +15,7 @@ Filtres (paramètres ci-dessous ou en ligne de commande) :
 
 La colonne `selection` combine les filtres budget (ancien OU VEFA) + distance + revenu.
 
-Usage : uv run --group carte python scripts/08_export_carte.py [--budget-ancien 210000] ...
+Usage : uv run python scripts/08_export_carte.py [--budget-ancien 210000] ...
 """
 
 import argparse
@@ -34,12 +34,6 @@ BUDGET_VEFA = 290_000
 SURFACE_CIBLE_M2 = 45
 DIST_STATION_MAX_M = 800
 REVENU_MIN = 0
-SIMPLIFICATION_M = 3  # simplification des contours IRIS pour l'affichage uniquement
-
-COULEURS_MODES = {
-    "metro": "#1f77b4", "rer": "#d62728", "transilien": "#8c564b", "tram": "#2ca02c", "cable": "#9467bd",
-    "metro_futur": "#17becf", "tram_futur": "#bcbd22", "rer_futur": "#ff7f0e",
-}
 
 
 def parametres() -> argparse.Namespace:
@@ -49,7 +43,6 @@ def parametres() -> argparse.Namespace:
     p.add_argument("--surface", type=float, default=SURFACE_CIBLE_M2)
     p.add_argument("--dist-max", type=float, default=DIST_STATION_MAX_M)
     p.add_argument("--revenu-min", type=float, default=REVENU_MIN)
-    p.add_argument("--sans-html", action="store_true", help="ne pas produire la carte Kepler HTML")
     return p.parse_args()
 
 
@@ -59,7 +52,7 @@ def preparer_iris(a: argparse.Namespace) -> gpd.GeoDataFrame:
         prix = i[f"prix_m2_median_{t}_24m"]
         i[f"prix_estime_{t}"] = (prix * a.surface).round(-3)
         i[f"surface_achetable_{t}_m2"] = (budget / prix).round(1)
-        i[f"dans_budget_{t}"] = i[f"prix_estime_{t}"] <= budget
+        i[f"dans_budget_{t}"] = prix * a.surface <= budget  # valeur exacte, pas l'estimation arrondie
     i["proche_station"] = i["dist_station_actuelle_m"] <= a.dist_max
     # Un IRIS au revenu secrétisé (NaN) n'est exclu que si un revenu minimum est demandé.
     i["revenu_suffisant"] = i["revenu_median"] >= a.revenu_min if a.revenu_min > 0 else True
@@ -102,73 +95,6 @@ def exporter_fichiers(couches: dict[str, gpd.GeoDataFrame]) -> None:
     print(f"écrits : {gpkg.relative_to(ROOT)} ({len(couches)} couches) et data/exports/kepler/")
 
 
-def config_kepler(iris: gpd.GeoDataFrame, a: argparse.Namespace, avec_qpv: bool) -> dict:
-    def filtre(fid, data_id, champ, valeur):
-        return {"id": fid, "dataId": [data_id], "name": [champ], "type": "range", "value": valeur,
-                "enlarged": False, "plotType": "histogram", "yAxis": None}
-
-    rev_max = float(iris["revenu_median"].max())
-    filtres = [
-        filtre("f_prix", "iris", "prix_m2_median_ancien_24m", [0, a.budget_ancien / a.surface]),
-        filtre("f_dist", "iris", "dist_station_actuelle_m", [0, a.dist_max]),
-        filtre("f_rev", "iris", "revenu_median", [a.revenu_min, rev_max]),
-    ]
-    palette = {"name": "Prix", "type": "sequential", "category": "Uber",
-               "colors": ["#1a9850", "#91cf60", "#d9ef8b", "#fee08b", "#fc8d59", "#d73027"]}
-    couches = [
-        {"id": "l_iris", "type": "geojson", "config": {
-            "dataId": "iris", "label": "IRIS — prix/m² ancien (24 mois)", "columns": {"geojson": "geometry"},
-            "isVisible": True,
-            "visConfig": {"opacity": 0.6, "strokeOpacity": 0.5, "thickness": 0.3, "strokeColor": [80, 80, 80],
-                          "colorRange": palette, "filled": True, "stroked": True}},
-         "visualChannels": {"colorField": {"name": "prix_m2_median_ancien_24m", "type": "real"}, "colorScale": "quantile"}},
-        {"id": "l_stations", "type": "point", "config": {
-            "dataId": "stations", "label": "Stations (actuelles et futures)",
-            "columns": {"lat": "lat", "lng": "lng", "altitude": None}, "isVisible": True,
-            "visConfig": {"radius": 4, "opacity": 0.9, "filled": True,
-                          "colorRange": {"name": "Modes", "type": "qualitative", "category": "Custom",
-                                         "colors": list(COULEURS_MODES.values())}}},
-         "visualChannels": {"colorField": {"name": "mode", "type": "string"}, "colorScale": "ordinal"}},
-        {"id": "l_ventes", "type": "point", "config": {
-            "dataId": "ventes", "label": "Ventes (24 mois)", "columns": {"lat": "lat", "lng": "lng", "altitude": None},
-            "isVisible": False, "visConfig": {"radius": 2, "opacity": 0.6, "colorRange": palette}},
-         "visualChannels": {"colorField": {"name": "prix_m2", "type": "real"}, "colorScale": "quantile"}},
-    ]
-    if avec_qpv:
-        couches.append({"id": "l_qpv", "type": "geojson", "config": {
-            "dataId": "qpv_tampon_300m", "label": "QPV + 300 m", "columns": {"geojson": "geometry"}, "isVisible": True,
-            "visConfig": {"opacity": 0.15, "strokeOpacity": 0.9, "thickness": 1, "strokeColor": [120, 0, 160],
-                          "filled": True, "stroked": True}}})
-    return {"version": "v1", "config": {
-        "visState": {"filters": filtres, "layers": couches},
-        "mapState": {"latitude": 48.86, "longitude": 2.40, "zoom": 10.3},
-        "mapStyle": {"styleType": "positron"}}}
-
-
-def exporter_html(couches: dict[str, gpd.GeoDataFrame], iris: gpd.GeoDataFrame, a: argparse.Namespace) -> None:
-    try:
-        from keplergl import KeplerGl
-    except ImportError:
-        print("keplergl absent : lancer avec `uv run --group carte ...` pour produire la carte HTML")
-        return
-
-    def wgs84(g):
-        return g.to_crs("EPSG:4326")
-
-    donnees = {
-        "iris": wgs84(couches["iris_indicateurs"].assign(
-            geometry=couches["iris_indicateurs"].geometry.simplify(SIMPLIFICATION_M))),
-        "stations": en_points(couches["stations"]),
-        "ventes": en_points(couches["ventes_24m"]).drop(columns=["id_mutation", "adresse"]),
-    }
-    if "qpv_tampon_300m" in couches:
-        donnees["qpv_tampon_300m"] = wgs84(couches["qpv_tampon_300m"])
-    carte = KeplerGl(data=donnees, config=config_kepler(iris, a, "qpv_tampon_300m" in couches))
-    chemin = EXPORT / "carte_kepler.html"
-    carte.save_to_html(file_name=str(chemin), read_only=False)
-    print(f"écrit : {chemin.relative_to(ROOT)} ({chemin.stat().st_size / 1e6:.1f} Mo)")
-
-
 def main() -> None:
     a = parametres()
     EXPORT.mkdir(parents=True, exist_ok=True)
@@ -184,8 +110,6 @@ def main() -> None:
     pc = iris[iris["code_departement"] != "75"]
     print(f"IRIS de petite couronne sélectionnés : {int(pc['selection'].sum())} / {len(pc)} "
           f"({pc['parametres'].iloc[0]})")
-    if not a.sans_html:
-        exporter_html(couches, iris, a)
 
 
 if __name__ == "__main__":

@@ -12,10 +12,6 @@ dependencies = [
 ]
 
 [dependency-groups]
-carte = [
-    "keplergl>=0.3.7",
-    "setuptools<81",
-]
 dev = [
     "jupyter>=1.1.1",
 ]

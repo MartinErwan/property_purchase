@@ -1,7 +1,7 @@
 # Carte de sélection de quartiers — petite couronne
 
 Pipeline reproductible qui croise prix réels (DVF), transports (IDFM), revenus (Filosofi) et QPV
-par IRIS, et exporte une carte pour QGIS et Kepler.gl. Contexte et règles : voir `CLAUDE.md`.
+par IRIS, et exporte une carte interactive HTML ainsi que des fichiers pour QGIS et Kepler.gl. Contexte et règles : voir `CLAUDE.md`.
 
 ## Lancer le pipeline
 
@@ -14,11 +14,13 @@ uv run python scripts/04_build_transports.py     # couche transports typée par 
 uv run python scripts/05_download_socio.py       # Filosofi 2021, contours IRIS 2022, QPV 2024
 uv run python scripts/06_build_iris_qpv.py       # IRIS + revenu médian, QPV + tampon 300 m
 uv run python scripts/07_indicateurs_iris.py     # indicateurs par IRIS
-uv run --group carte python scripts/08_export_carte.py   # exports QGIS / Kepler
+uv run python scripts/08_export_carte.py         # exports QGIS / Kepler
+uv run python scripts/09_carte_html.py           # carte HTML interactive
 ```
 
-Les filtres de l'export se règlent en ligne de commande, par exemple :
-`uv run --group carte python scripts/08_export_carte.py --budget-ancien 230000 --surface 50 --dist-max 600 --revenu-min 20000`
+Les valeurs initiales des filtres se règlent en ligne de commande (script 08), par exemple :
+`uv run python scripts/08_export_carte.py --budget-ancien 230000 --surface 50 --dist-max 600 --revenu-min 20000`.
+Dans `carte.html`, tous les filtres restent modifiables à la souris.
 
 Les notebooks `notebooks/0X_*.ipynb` contrôlent chaque étape (exploration puis vérification).
 
@@ -27,7 +29,7 @@ Les notebooks `notebooks/0X_*.ipynb` contrôlent chaque étape (exploration puis
 | Fichier | Usage |
 |---|---|
 | `carte.gpkg` | QGIS : couches `iris_indicateurs`, `stations`, `ventes_24m` (+ `qpv`, `qpv_tampon_300m` si disponibles), Lambert-93 |
-| `carte_kepler.html` | Carte Kepler.gl autonome, filtres préréglés (nécessite internet pour charger les bibliothèques) |
+| `carte.html` | Carte interactive autonome (MapLibre GL intégré) : prix par IRIS, pictogrammes métro/RER/tram/Transilien, gares futures en pointillé orange, QPV hachurés, tampon de 300 m en tirets, filtres et infobulles. Seul le fond de plan (CARTO/OpenStreetMap) vient d'internet |
 | `kepler/*.geojson`, `kepler/*.csv` | À glisser dans https://kepler.gl/demo |
 
 Colonnes principales de `iris_indicateurs` : `prix_m2_median_{ancien,vefa}_24m` et `n_ventes_*`,

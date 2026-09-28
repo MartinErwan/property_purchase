@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quartiers petite couronne</title>
+<style>/*__MAPLIBRE_CSS__*/</style>
+<style>
+  :root {
+    --surface: #fcfcfb; --page: #f9f9f7; --ink: #0b0b0b; --ink-2: #52514e; --rule: #dedcd6;
+    --accent: #2a78d6; --futur: #c2410c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--page); color: var(--ink);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #app { display: flex; height: 100%; }
+  #panneau { width: 340px; flex: none; overflow-y: auto; background: var(--surface);
+    border-right: 1px solid var(--rule); padding: 16px; }
+  #carte { flex: 1; position: relative; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-2);
+    margin: 18px 0 8px; font-weight: 600; }
+  .sous-titre { color: var(--ink-2); font-size: 12px; margin: 0; }
+  label.ligne { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 8px; margin: 8px 0; }
+  label.ligne input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+  .val { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .case { display: flex; gap: 8px; align-items: flex-start; margin: 6px 0; }
+  select { width: 100%; padding: 6px; font: inherit; border: 1px solid var(--rule); border-radius: 6px; background: #fff; }
+  #compte { margin-top: 10px; padding: 8px 10px; background: #eef4fc; border-radius: 6px; font-size: 13px; }
+  .leg { list-style: none; padding: 0; margin: 0; }
+  .leg li { display: flex; align-items: center; gap: 10px; margin: 5px 0; font-size: 13px; }
+  .pastille { width: 22px; height: 14px; border-radius: 3px; flex: none; }
+  .leg img { width: 28px; height: 20px; object-fit: contain; flex: none; }
+  .note { color: var(--ink-2); font-size: 12px; margin-top: 12px; }
+  #infobulle { position: absolute; pointer-events: none; background: #fff; border: 1px solid var(--rule);
+    border-radius: 8px; padding: 8px 10px; box-shadow: 0 4px 16px rgba(0,0,0,.12); font-size: 12.5px;
+    max-width: 300px; display: none; z-index: 5; }
+  #infobulle b { font-size: 13px; }
+  #infobulle table { border-collapse: collapse; margin-top: 4px; }
+  #infobulle td { padding: 1px 6px 1px 0; vertical-align: top; }
+  #infobulle td:first-child { color: var(--ink-2); }
+  .tag { display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 11px; background: #eef4fc; color: #184f95; }
+  @media (max-width: 760px) {
+    #app { flex-direction: column; }
+    #panneau { width: 100%; max-height: 45%; border-right: none; border-bottom: 1px solid var(--rule); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="panneau">
+    <h1>Où acheter en petite couronne</h1>
+    <p class="sous-titre" id="periode"></p>
+
+    <h2>Couleur des IRIS</h2>
+    <select id="indicateur">
+      <option value="pa">Prix/m² médian — ancien</option>
+      <option value="pv">Prix/m² médian — neuf (VEFA)</option>
+      <option value="rv">Revenu médian disponible (€/an/UC)</option>
+    </select>
+    <ul class="leg" id="leg-couleurs" style="margin-top:10px"></ul>
+
+    <h2>Filtres</h2>
+    <label class="ligne">Budget ancien <span class="val" id="v-ba"></span>
+      <input type="range" id="ba" min="100000" max="600000" step="5000"></label>
+    <label class="ligne">Budget neuf (VEFA) <span class="val" id="v-bv"></span>
+      <input type="range" id="bv" min="100000" max="600000" step="5000"></label>
+    <label class="ligne">Surface visée <span class="val" id="v-su"></span>
+      <input type="range" id="su" min="20" max="100" step="1"></label>
+    <label class="ligne">Station à moins de <span class="val" id="v-di"></span>
+      <input type="range" id="di" min="200" max="2500" step="50"></label>
+    <label class="ligne">Revenu médian minimum <span class="val" id="v-rv"></span>
+      <input type="range" id="rvmin" min="0" max="40000" step="500"></label>
+    <label class="case"><input type="checkbox" id="horsqpv"> <span>Exclure les IRIS qui touchent un QPV ou son tampon de 300 m</span></label>
+    <div id="compte"></div>
+
+    <h2>Couches</h2>
+    <label class="case"><input type="checkbox" id="c-st" checked> Stations actuelles</label>
+    <label class="case"><input type="checkbox" id="c-fu" checked> Gares et stations futures</label>
+    <label class="case"><input type="checkbox" id="c-qpv" checked> QPV et tampon 300 m</label>
+    <label class="case"><input type="checkbox" id="c-ve"> Ventes des 24 derniers mois</label>
+
+    <h2>Légende</h2>
+    <ul class="leg" id="leg-symboles"></ul>
+
+    <p class="note">
+      IRIS en couleur vive = dans les filtres ; estompé = hors filtres. Prix médian calculé à partir de 5 ventes
+      (DVF, appartements, dépendances incluses) ; budget hors frais de notaire. Distances à vol d'oiseau.
+      Revenus : Filosofi 2021 (INSEE). Transports : IDFM. QPV 2024 : ANCT. Le tampon de 300 m est le
+      périmètre de TVA à 5,5 % en accession (conditions de ressources, non vérifiées ici).
+    </p>
+  </aside>
+  <main id="carte"><div id="infobulle"></div></main>
+</div>
+
+<script>/*__MAPLIBRE_JS__*/</script>
+<script>/*__DATA__*/</script>
+<script>
+"use strict";
+// ---------- Échelles de couleur (rampe bleue séquentielle, 7 classes) ----------
+const BLEUS = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"];
+const SANS_DONNEE = "#e8e7e3";
+const ECHELLES = {
+  pa: { seuils: [3000, 4000, 5000, 6000, 7500, 10000], unite: "€/m²" },
+  pv: { seuils: [4000, 5000, 6000, 7000, 8500, 11000], unite: "€/m²" },
+  rv: { seuils: [15000, 18000, 21000, 24000, 28000, 33000], unite: "€" },
+};
+const fmt = (n) => n == null ? "—" : Math.round(n).toLocaleString("fr-FR");
+
+// ---------- Pictogrammes dessinés sur canvas (aucune ressource externe) ----------
+const ENCRE = "#0b0b0b", FUTUR = getComputedStyle(document.documentElement).getPropertyValue("--futur").trim();
+function picto({ forme, texte, couleur, pointille }) {
+  const r = 2, w = forme === "rect" ? 34 : 24, h = 24, c = document.createElement("canvas");
+  c.width = w * r; c.height = h * r;
+  const x = c.getContext("2d"); x.scale(r, r);
+  x.lineWidth = 2; x.strokeStyle = couleur; x.fillStyle = "#ffffff";
+  if (pointille) x.setLineDash([3, 2]);
+  x.beginPath();
+  if (forme === "rond") x.arc(12, 12, 10, 0, 2 * Math.PI);
+  else if (forme === "carre") x.roundRect(2, 2, 20, 20, 3);
+  else x.roundRect(2, 3, 30, 18, 5);
+  x.fill(); x.stroke(); x.setLineDash([]);
+  x.fillStyle = couleur; x.textAlign = "center"; x.textBaseline = "middle";
+  x.font = `700 ${texte.length > 2 ? 10 : texte.length > 1 ? 10 : 13}px system-ui, sans-serif`;
+  x.fillText(texte, w / 2, 12.5);
+  return c;
+}
+const PICTOS = {
+  metro:       { forme: "rond",  texte: "M",   couleur: ENCRE, libelle: "Métro" },
+  rer:         { forme: "rect",  texte: "RER", couleur: ENCRE, libelle: "RER" },
+  transilien:  { forme: "carre", texte: "TN",  couleur: ENCRE, libelle: "Train Transilien" },
+  tram:        { forme: "rond",  texte: "T",   couleur: ENCRE, libelle: "Tramway" },
+  cable:       { forme: "rond",  texte: "C",   couleur: ENCRE, libelle: "Câble C1" },
+  metro_futur: { forme: "rond",  texte: "M",   couleur: FUTUR, pointille: true, libelle: "Grand Paris Express (futur)" },
+  tram_futur:  { forme: "rond",  texte: "T",   couleur: FUTUR, pointille: true, libelle: "Tramway (projet)" },
+  rer_futur:   { forme: "rect",  texte: "RER", couleur: FUTUR, pointille: true, libelle: "RER E (prolongement)" },
+};
+function hachure() {
+  const r = 2, s = 9, c = document.createElement("canvas");
+  c.width = s * r; c.height = s * r;
+  const x = c.getContext("2d"); x.scale(r, r);
+  x.strokeStyle = "#1f1f1f"; x.lineWidth = 1.1; x.lineCap = "square";
+  for (const d of [-s, 0, s]) { x.beginPath(); x.moveTo(d, s); x.lineTo(d + s, 0); x.stroke(); }
+  return c;
+}
+
+// ---------- Filtres ----------
+const D = DATA.defauts;
+const etat = { ind: "pa", ba: D.budget_ancien, bv: D.budget_vefa, su: D.surface, di: D.dist_max, rv: D.revenu_min, horsqpv: false };
+
+function estSelectionne(p) {
+  const budget = (p.pa != null && p.pa * etat.su <= etat.ba) || (p.pv != null && p.pv * etat.su <= etat.bv);
+  const station = p.da != null && p.da <= etat.di;
+  const revenu = etat.rv <= 0 || (p.rv != null && p.rv >= etat.rv);
+  const qpv = !etat.horsqpv || !(p.tq > 0);
+  return budget && station && revenu && qpv;
+}
+function exprSelection() {
+  const num = (k, defaut) => ["coalesce", ["get", k], defaut];
+  const e = ["all",
+    ["any", ["<=", ["*", num("pa", 1e12), etat.su], etat.ba], ["<=", ["*", num("pv", 1e12), etat.su], etat.bv]],
+    ["<=", num("da", 1e12), etat.di]];
+  if (etat.rv > 0) e.push([">=", num("rv", -1), etat.rv]);
+  if (etat.horsqpv) e.push(["<=", num("tq", 0), 0]);
+  return e;
+}
+function exprCouleur() {
+  const { seuils } = ECHELLES[etat.ind], pas = ["step", ["get", etat.ind], BLEUS[0]];
+  seuils.forEach((s, k) => pas.push(s, BLEUS[k + 1]));
+  return ["case", ["==", ["typeof", ["get", etat.ind]], "number"], pas, SANS_DONNEE];
+}
+
+// ---------- Carte ----------
+const carte = new maplibregl.Map({
+  container: "carte",
+  style: {
+    version: 8,
+    sources: { fond: { type: "raster", tileSize: 256,
+      tiles: ["a", "b", "c", "d"].map((s) => `https://${s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png`),
+      attribution: "© OpenStreetMap contributors © CARTO" } },
+    layers: [{ id: "page", type: "background", paint: { "background-color": "#f4f3ef" } },
+             { id: "fond", type: "raster", source: "fond", paint: { "raster-opacity": 0.9 } }],
+  },
+  center: [2.40, 48.86], zoom: 10.3, minZoom: 8.5, maxZoom: 17, attributionControl: { compact: true },
+});
+carte.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+carte.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
+
+const ventesGeo = { type: "FeatureCollection", features: DATA.ventes.map(([lng, lat, p, t, d, s, v]) => ({
+  type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] }, properties: { p, t, d, s, v } })) };
+
+carte.on("load", () => {
+  for (const [nom, def] of Object.entries(PICTOS)) {
+    const c = picto(def);
+    carte.addImage(nom, c.getContext("2d").getImageData(0, 0, c.width, c.height), { pixelRatio: 2 });
+  }
+  const h = hachure();
+  carte.addImage("hachure", h.getContext("2d").getImageData(0, 0, h.width, h.height), { pixelRatio: 2 });
+
+  carte.addSource("iris", { type: "geojson", data: DATA.iris });
+  carte.addSource("communes", { type: "geojson", data: DATA.communes });
+  carte.addSource("stations", { type: "geojson", data: DATA.stations });
+  carte.addSource("ventes", { type: "geojson", data: ventesGeo });
+
+  carte.addLayer({ id: "iris", type: "fill", source: "iris",
+    paint: { "fill-color": exprCouleur(), "fill-opacity": ["case", exprSelection(), 0.8, 0.3] } });
+  carte.addLayer({ id: "iris-bord", type: "line", source: "iris", minzoom: 11,
+    paint: { "line-color": "#ffffff", "line-width": 0.6, "line-opacity": 0.8 } });
+  carte.addLayer({ id: "iris-sel", type: "line", source: "iris", filter: exprSelection(),
+    paint: { "line-color": ENCRE, "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.4, 13, 1.2], "line-opacity": 0.55 } });
+  carte.addLayer({ id: "communes", type: "line", source: "communes",
+    paint: { "line-color": "#6b6a66", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.6, 13, 1.4] } });
+
+  if (DATA.qpv) {
+    carte.addSource("qpv", { type: "geojson", data: DATA.qpv });
+    carte.addSource("tampon", { type: "geojson", data: DATA.tampon });
+    carte.addLayer({ id: "qpv", type: "fill", source: "qpv", paint: { "fill-pattern": "hachure", "fill-opacity": 0.75 } });
+    carte.addLayer({ id: "qpv-bord", type: "line", source: "qpv", paint: { "line-color": "#1f1f1f", "line-width": 1.3 } });
+    carte.addLayer({ id: "tampon", type: "line", source: "tampon",
+      paint: { "line-color": "#1f1f1f", "line-width": 1.1, "line-dasharray": [3, 2] } });
+  }
+
+  carte.addLayer({ id: "ventes", type: "circle", source: "ventes", layout: { visibility: "none" },
+    paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 15, 4.5],
+             "circle-color": ["step", ["get", "p"], BLEUS[0], 3000, BLEUS[1], 4000, BLEUS[2], 5000, BLEUS[3],
+                              6000, BLEUS[4], 7500, BLEUS[5], 10000, BLEUS[6]],
+             "circle-stroke-color": "#ffffff", "circle-stroke-width": 0.8 } });
+
+  const taille = ["interpolate", ["linear"], ["zoom"], 9, 0.4, 11, 0.58, 13, 0.85, 15, 1.05];
+  const symboles = (id, modes, minzoom) => carte.addLayer({ id, type: "symbol", source: "stations", minzoom,
+    filter: ["in", ["get", "m"], ["literal", modes]],
+    layout: { "icon-image": ["get", "m"], "icon-size": taille, "icon-allow-overlap": true, "icon-ignore-placement": true,
+              "symbol-sort-key": ["match", ["get", "m"], "rer", 3, "metro", 2, 1] } });
+  symboles("st-leger", ["tram", "transilien", "cable"], 11);
+  symboles("st-rer", ["rer"], 9);
+  symboles("st-metro", ["metro"], 10.5);
+  symboles("st-futur", ["metro_futur", "tram_futur", "rer_futur"], 9);
+
+  brancherControles();
+  construireLegende();
+  mettreAJour();
+});
+
+// ---------- Infobulle ----------
+const bulle = document.getElementById("infobulle");
+function contenu(f) {
+  const p = f.properties, lay = f.layer.id;
+  if (lay.startsWith("st-")) {
+    const futur = lay === "st-futur";
+    return `<b>${p.n}</b><br>${PICTOS[p.m].libelle} — ${p.l}` + (futur ? `<br><span class="tag">${p.st}</span>` : "");
+  }
+  if (lay === "ventes") return `<b>${fmt(p.p)} €/m²</b> — ${p.t === "a" ? "ancien" : "neuf (VEFA)"}<br>${fmt(p.v)} € · ${p.s} m² · ${p.d}`;
+  if (lay === "qpv") return `<b>QPV ${p.n}</b><br>${p.cm} — ${p.c}`;
+  const pct = (x) => x == null ? "—" : `${Math.round(x * 100)} %`;
+  const evol = p.ea == null ? "" : ` (${p.ea > 0 ? "+" : ""}${Math.round(p.ea * 100)} % vs 2 ans avant)`;
+  return `<b>${p.ni}</b> — ${p.nc} ${estSelectionne(p) ? '<span class="tag">dans les filtres</span>' : ""}
+    <table>
+      <tr><td>Prix ancien</td><td>${fmt(p.pa)} €/m² · ${p.na} ventes${evol}</td></tr>
+      <tr><td>Prix neuf</td><td>${fmt(p.pv)} €/m² · ${p.nv} ventes</td></tr>
+      ${p.pa == null ? `<tr><td>Repère commune</td><td>${fmt(p.pac)} €/m² (ancien)</td></tr>` : ""}
+      <tr><td>Revenu médian</td><td>${fmt(p.rv)} €${p.rs === "commune" ? " (commune)" : ""}</td></tr>
+      <tr><td>Station</td><td>${p.sa ?? "—"} à ${fmt(p.da)} m</td></tr>
+      <tr><td>Future</td><td>${p.sf ?? "—"} à ${fmt(p.df)} m</td></tr>
+      <tr><td>QPV</td><td>${pct(p.q)} de la surface · tampon ${pct(p.tq)}</td></tr>
+    </table>`;
+}
+carte.on("mousemove", (e) => {
+  const ordre = ["st-futur", "st-rer", "st-metro", "st-leger", "ventes", "qpv", "iris"].filter((l) => carte.getLayer(l));
+  const f = carte.queryRenderedFeatures(e.point, { layers: ordre })
+    .sort((a, b) => ordre.indexOf(a.layer.id) - ordre.indexOf(b.layer.id))[0];
+  carte.getCanvas().style.cursor = f ? "pointer" : "";
+  if (!f) { bulle.style.display = "none"; return; }
+  bulle.innerHTML = contenu(f);
+  bulle.style.display = "block";
+  const W = carte.getContainer().clientWidth, x = e.point.x + 14, y = e.point.y + 14;
+  bulle.style.left = `${Math.min(x, W - bulle.offsetWidth - 8)}px`;
+  bulle.style.top = `${y}px`;
+});
+carte.on("mouseout", () => { bulle.style.display = "none"; });
+
+// ---------- Contrôles et légende ----------
+function brancherControles() {
+  const champs = { ba: "€", bv: "€", su: "m²", di: "m", rvmin: "€" };
+  for (const [id, unite] of Object.entries(champs)) {
+    const el = document.getElementById(id), cle = id === "rvmin" ? "rv" : id;
+    el.value = etat[cle];
+    const maj = () => { etat[cle] = +el.value; document.getElementById(`v-${cle}`).textContent =
+      (cle === "rv" && etat.rv === 0) ? "aucun" : `${fmt(etat[cle])} ${unite}`; };
+    maj();
+    el.addEventListener("input", () => { maj(); mettreAJour(); });
+  }
+  document.getElementById("horsqpv").addEventListener("change", (e) => { etat.horsqpv = e.target.checked; mettreAJour(); });
+  document.getElementById("indicateur").addEventListener("change", (e) => { etat.ind = e.target.value; mettreAJour(); construireLegende(); });
+  const bascule = (id, couches) => document.getElementById(id).addEventListener("change", (e) =>
+    couches.filter((l) => carte.getLayer(l)).forEach((l) => carte.setLayoutProperty(l, "visibility", e.target.checked ? "visible" : "none")));
+  bascule("c-st", ["st-rer", "st-metro", "st-leger"]);
+  bascule("c-fu", ["st-futur"]);
+  bascule("c-qpv", ["qpv", "qpv-bord", "tampon"]);
+  bascule("c-ve", ["ventes"]);
+  if (!DATA.qpv) { document.getElementById("c-qpv").disabled = true; document.getElementById("horsqpv").disabled = true; }
+}
+
+function mettreAJour() {
+  const sel = exprSelection();
+  carte.setPaintProperty("iris", "fill-color", exprCouleur());
+  carte.setPaintProperty("iris", "fill-opacity", ["case", sel, 0.8, 0.3]);
+  carte.setFilter("iris-sel", sel);
+  const pc = DATA.iris.features.filter((f) => f.properties.dep !== "75");
+  const parDep = {};
+  for (const f of pc) if (estSelectionne(f.properties)) parDep[f.properties.dep] = (parDep[f.properties.dep] || 0) + 1;
+  const total = Object.values(parDep).reduce((a, b) => a + b, 0);
+  document.getElementById("compte").innerHTML = `<b>${total}</b> IRIS de petite couronne sur ${pc.length} dans les filtres<br>` +
+    ["92", "93", "94"].map((d) => `${d} : ${parDep[d] || 0}`).join(" · ");
+}
+
+function construireLegende() {
+  const { seuils, unite } = ECHELLES[etat.ind];
+  const lignes = BLEUS.map((c, k) => {
+    const txt = k === 0 ? `moins de ${fmt(seuils[0])}` : k === BLEUS.length - 1 ? `${fmt(seuils[k - 1])} et plus`
+      : `${fmt(seuils[k - 1])} – ${fmt(seuils[k])}`;
+    return `<li><span class="pastille" style="background:${c}"></span>${txt} ${unite}</li>`;
+  });
+  lignes.push(`<li><span class="pastille" style="background:${SANS_DONNEE}"></span>Moins de 5 ventes / secret statistique</li>`);
+  document.getElementById("leg-couleurs").innerHTML = lignes.join("");
+
+  if (document.getElementById("leg-symboles").childElementCount) return;
+  const img = (c) => `<img src="${c.toDataURL()}" alt="">`;
+  const h = hachure(), zone = document.createElement("canvas");
+  zone.width = 56; zone.height = 40;
+  const x = zone.getContext("2d");
+  x.fillStyle = x.createPattern(h, "repeat"); x.fillRect(2, 2, 52, 36);
+  x.strokeStyle = "#1f1f1f"; x.lineWidth = 2.6; x.strokeRect(2, 2, 52, 36);
+  const tir = document.createElement("canvas"); tir.width = 56; tir.height = 40;
+  const y = tir.getContext("2d"); y.strokeStyle = "#1f1f1f"; y.lineWidth = 2.2; y.setLineDash([6, 4]);
+  y.beginPath(); y.moveTo(2, 20); y.lineTo(54, 20); y.stroke();
+  const sel = document.createElement("canvas"); sel.width = 56; sel.height = 40;
+  const z = sel.getContext("2d"); z.fillStyle = BLEUS[3]; z.fillRect(2, 2, 52, 36);
+  z.strokeStyle = ENCRE; z.lineWidth = 2.4; z.strokeRect(2, 2, 52, 36);
+  const items = Object.values(PICTOS).map((d) => `<li>${img(picto(d))}${d.libelle}</li>`);
+  items.push(`<li>${img(zone)}Quartier prioritaire (QPV 2024)</li>`,
+             `<li>${img(tir)}Limite des 300 m autour d'un QPV</li>`,
+             `<li>${img(sel)}IRIS dans les filtres (contour foncé)</li>`);
+  document.getElementById("leg-symboles").innerHTML = items.join("");
+}
+
+document.getElementById("periode").textContent =
+  `Ventes ${DATA.periode.replace(" / ", " → ")} · IRIS 2022 · données ouvertes`;
+</script>
+</body>
+</html>
