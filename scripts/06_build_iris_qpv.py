@@ -75,11 +75,15 @@ def construire_iris() -> gpd.GeoDataFrame:
 
 
 def construire_qpv(zone: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame] | None:
-    gpkgs = sorted((RAW / "qpv").glob("**/*.gpkg"))
+    # L'archive ANCT contient plusieurs GeoPackages (hexagone, outre-mer…) : on prend celui de
+    # la France hexagonale en Lambert-93 s'il existe.
+    gpkgs = sorted((RAW / "qpv").glob("**/*.gpkg"), key=lambda f: "hexagonale_lb93" not in f.name.lower())
     if not gpkgs:
         print("QPV : aucun fichier dans data/raw/qpv (téléchargement impossible) → couche non produite")
         return None
     qpv = gpd.read_file(gpkgs[0]).to_crs("EPSG:2154")
+    # Certaines géométries sources sont invalides : réparation avant intersections et tampons.
+    qpv["geometry"] = qpv.make_valid()
     # QPV de la zone d'étude : ceux qui touchent l'emprise des IRIS (tampon inclus, pour ne pas
     # rater un QPV voisin dont le tampon déborde sur la zone).
     emprise = zone.union_all().buffer(TAMPON_QPV_M)

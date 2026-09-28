@@ -6,8 +6,9 @@
   communes non découpées en IRIS. 2021 est le dernier millésime : l'INSEE a annoncé que 2022 ne
   sera pas produit.
 - Contours IRIS édition 2022-01-01 (IGN, Géoplateforme) : même géographie que Filosofi 2021.
-- QPV génération 2024, périmètres GPKG (ANCT, data.gouv.fr, jeu
-  « quartiers-prioritaires-de-la-politique-de-la-ville-qpv »).
+- QPV génération 2024, archive complète des périmètres (GeoJSON, GPKG, SHP) (ANCT, data.gouv.fr,
+  jeu « quartiers-prioritaires-de-la-politique-de-la-ville-qpv »). Si static.data.gouv.fr est
+  injoignable, déposer `qpv-2024.zip` à la main dans data/raw/qpv/ : le script le dézippe.
 
 Chaque source est téléchargée indépendamment : l'échec de l'une n'empêche pas les autres.
 
@@ -31,7 +32,7 @@ SOURCES = {
     ),
     "qpv": (
         "https://static.data.gouv.fr/resources/quartiers-prioritaires-de-la-politique-de-la-ville-qpv/"
-        "20260115-205144/qpv-2024-gpkg.zip"
+        "20260109-162140/qpv-2024.zip"
     ),
 }
 

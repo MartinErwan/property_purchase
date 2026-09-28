@@ -47,6 +47,6 @@ Colonnes principales de `iris_indicateurs` : `prix_m2_median_{ancien,vefa}_24m` 
 - **Budget** : frais de notaire non inclus ; surface cible par défaut 45 m² (hypothèse).
 - **QPV / TVA 5,5 %** : tampon de 300 m seulement. Le tampon de 500 m (QPV sous convention
   NPNRU) n'est pas appliqué : règle et liste non vérifiées à la source.
-- **QPV 2024 non téléchargés à ce jour** : `static.data.gouv.fr` était injoignable depuis
-  l'environnement de travail. Déposer `qpv-2024-gpkg.zip` (jeu ANCT « quartiers-prioritaires-de-la-politique-de-la-ville-qpv »
-  sur data.gouv.fr) dans `data/raw/qpv/`, le dézipper, puis relancer les scripts 06, 07 et 08.
+- **QPV 2024** : archive ANCT `qpv-2024.zip` (jeu « quartiers-prioritaires-de-la-politique-de-la-ville-qpv »
+  sur data.gouv.fr), couche France hexagonale en Lambert-93, géométries réparées (`make_valid`).
+  Si `static.data.gouv.fr` est injoignable, déposer l'archive à la main dans `data/raw/qpv/`.
