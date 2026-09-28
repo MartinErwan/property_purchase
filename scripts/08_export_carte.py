@@ -101,7 +101,9 @@ def main() -> None:
     iris = preparer_iris(a)
     stations = gpd.read_parquet(PROC / "transports.parquet")
     stations = stations[stations.intersects(iris.union_all().envelope.buffer(5_000))]
-    couches = {"iris_indicateurs": iris, "stations": stations, "ventes_24m": ventes_recentes(iris)}
+    lignes = gpd.read_parquet(PROC / "lignes.parquet")
+    lignes = lignes.clip(iris.union_all().envelope.buffer(5_000))
+    couches = {"iris_indicateurs": iris, "stations": stations, "lignes": lignes, "ventes_24m": ventes_recentes(iris)}
     for nom in ("qpv", "qpv_tampon_300m"):
         if (PROC / f"{nom}.parquet").exists():
             couches[nom] = gpd.read_parquet(PROC / f"{nom}.parquet")

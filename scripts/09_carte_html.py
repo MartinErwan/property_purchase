@@ -1,8 +1,10 @@
-"""Carte HTML interactive autonome (MapLibre GL) : prix par IRIS, stations en pictogrammes,
-QPV hachurés, filtres budget / distance / revenu / QPV réglables dans la page.
+"""Carte HTML interactive autonome (MapLibre GL) : IRIS dans les filtres colorés par prix, tracés
+des lignes à leur couleur officielle avec un point par station, QPV hachurés, filtres budget /
+distance / revenu / QPV réglables dans la page.
 
 Entrée  : data/exports/carte.gpkg (scripts/08_export_carte.py)
-Sortie  : data/exports/carte.html (un seul fichier ; seul le fond de plan est chargé depuis internet)
+Sortie  : data/exports/carte.html (un seul fichier ; seul le fond de plan est chargé depuis internet :
+          Plan IGN v2 de la Géoplateforme, sans clé d'API)
 
 La bibliothèque MapLibre GL JS (licence BSD-3) est téléchargée une fois depuis le registre npm
 dans data/raw/vendor/ puis intégrée dans la page.
@@ -82,18 +84,29 @@ def preparer() -> dict:
     communes["geometry"] = communes.boundary.simplify(SIMPLIFICATION_M)
     communes = geojson(communes, {"nom_commune": "n"})
 
-    # Stations : une icône par station et par mode (les lignes sont regroupées).
+    # Stations : un point par station (toutes lignes regroupées). Stations actuelles regroupées par
+    # zone d'arrêt IDFM (id_ref_zdc), futures par nom. Une correspondance (plusieurs lignes) est
+    # dessinée à part ; sinon le point prend la couleur de sa ligne.
     s = gpd.read_file(gpkg, layer="stations")
-    s = (s.groupby(["nom", "mode"], as_index=False)
-          .agg(lignes=("ligne", lambda x: ", ".join(sorted(set(x)))), statut=("statut", "first"),
+    s["cle"] = s["id_ref_zdc"].where(s["existant"], "futur:" + s["nom"])
+    s = (s.groupby("cle", as_index=False)
+          .agg(nom=("nom", "first"), lignes=("ligne", lambda x: ", ".join(sorted(set(x)))),
+               n_lignes=("ligne", "nunique"), couleur=("couleur", "first"), statut=("statut", "first"),
                existant=("existant", "first"), geometry=("geometry", "first")))
+    s["correspondance"] = s["n_lignes"] > 1
     s = gpd.GeoDataFrame(s, geometry="geometry", crs="EPSG:2154")
-    stations = geojson(s, {"nom": "n", "mode": "m", "lignes": "l", "statut": "st"})
+    stations = geojson(s, {"nom": "n", "lignes": "l", "couleur": "c", "statut": "st", "existant": "e",
+                           "correspondance": "x"})
+
+    lg = gpd.read_file(gpkg, layer="lignes")
+    lg["geometry"] = lg.geometry.simplify(SIMPLIFICATION_M)
+    lignes = geojson(lg, {"ligne": "l", "mode": "m", "couleur": "c"})
 
     # Valeurs initiales des filtres = paramètres utilisés par le script 08 (texte de la colonne `parametres`).
     budget_ancien, budget_vefa, surface, dist_max, revenu_min = map(
         float, re.findall(r"\d+(?:\.\d+)?", i["parametres"].iloc[0]))
-    donnees = {"iris": iris, "communes": communes, "stations": stations, "periode": i["periode_24m"].iloc[0],
+    donnees = {"iris": iris, "communes": communes, "stations": stations, "lignes": lignes,
+               "periode": i["periode_24m"].iloc[0],
                "defauts": {"budget_ancien": budget_ancien, "budget_vefa": budget_vefa, "surface": surface,
                            "dist_max": dist_max, "revenu_min": revenu_min}}
 

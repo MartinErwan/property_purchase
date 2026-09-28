@@ -7,8 +7,7 @@
 <style>/*__MAPLIBRE_CSS__*/</style>
 <style>
   :root {
-    --surface: #fcfcfb; --page: #f9f9f7; --ink: #0b0b0b; --ink-2: #52514e; --rule: #dedcd6;
-    --accent: #2a78d6; --futur: #c2410c;
+    --surface: #fcfcfb; --page: #f9f9f7; --ink: #0b0b0b; --ink-2: #52514e; --rule: #dedcd6; --accent: #2a78d6;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--page); color: var(--ink);
@@ -29,8 +28,8 @@
   #compte { margin-top: 10px; padding: 8px 10px; background: #eef4fc; border-radius: 6px; font-size: 13px; }
   .leg { list-style: none; padding: 0; margin: 0; }
   .leg li { display: flex; align-items: center; gap: 10px; margin: 5px 0; font-size: 13px; }
-  .pastille { width: 22px; height: 14px; border-radius: 3px; flex: none; }
-  .leg img { width: 28px; height: 20px; object-fit: contain; flex: none; }
+  .pastille { width: 22px; height: 14px; border-radius: 3px; flex: none; border: 1px solid rgba(0,0,0,.12); }
+  .leg canvas { width: 28px; height: 20px; flex: none; }
   .note { color: var(--ink-2); font-size: 12px; margin-top: 12px; }
   #infobulle { position: absolute; pointer-events: none; background: #fff; border: 1px solid var(--rule);
     border-radius: 8px; padding: 8px 10px; box-shadow: 0 4px 16px rgba(0,0,0,.12); font-size: 12.5px;
@@ -40,6 +39,7 @@
   #infobulle td { padding: 1px 6px 1px 0; vertical-align: top; }
   #infobulle td:first-child { color: var(--ink-2); }
   .tag { display: inline-block; padding: 0 6px; border-radius: 4px; font-size: 11px; background: #eef4fc; color: #184f95; }
+  .puce { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
   @media (max-width: 760px) {
     #app { flex-direction: column; }
     #panneau { width: 100%; max-height: 45%; border-right: none; border-bottom: 1px solid var(--rule); }
@@ -52,7 +52,7 @@
     <h1>Où acheter en petite couronne</h1>
     <p class="sous-titre" id="periode"></p>
 
-    <h2>Couleur des IRIS</h2>
+    <h2>Couleur des IRIS retenus</h2>
     <select id="indicateur">
       <option value="pa">Prix/m² médian — ancien</option>
       <option value="pv">Prix/m² médian — neuf (VEFA)</option>
@@ -75,7 +75,7 @@
     <div id="compte"></div>
 
     <h2>Couches</h2>
-    <label class="case"><input type="checkbox" id="c-st" checked> Stations actuelles</label>
+    <label class="case"><input type="checkbox" id="c-st" checked> Lignes et stations en service</label>
     <label class="case"><input type="checkbox" id="c-fu" checked> Gares et stations futures</label>
     <label class="case"><input type="checkbox" id="c-qpv" checked> QPV et tampon 300 m</label>
     <label class="case"><input type="checkbox" id="c-ve"> Ventes des 24 derniers mois</label>
@@ -84,10 +84,11 @@
     <ul class="leg" id="leg-symboles"></ul>
 
     <p class="note">
-      IRIS en couleur vive = dans les filtres ; estompé = hors filtres. Prix médian calculé à partir de 5 ventes
+      Seuls les IRIS qui passent les filtres sont colorés. Prix médian calculé à partir de 5 ventes
       (DVF, appartements, dépendances incluses) ; budget hors frais de notaire. Distances à vol d'oiseau.
-      Revenus : Filosofi 2021 (INSEE). Transports : IDFM. QPV 2024 : ANCT. Le tampon de 300 m est le
-      périmètre de TVA à 5,5 % en accession (conditions de ressources, non vérifiées ici).
+      Revenus : Filosofi 2021 (INSEE). Transports : IDFM (couleurs officielles des lignes ; pas de tracé
+      publié pour les lignes du Grand Paris Express). QPV 2024 : ANCT. Le tampon de 300 m est le périmètre
+      de TVA à 5,5 % en accession (conditions de ressources, non vérifiées ici). Fond : Plan IGN.
     </p>
   </aside>
   <main id="carte"><div id="infobulle"></div></main>
@@ -97,49 +98,23 @@
 <script>/*__DATA__*/</script>
 <script>
 "use strict";
-// ---------- Échelles de couleur (rampe bleue séquentielle, 7 classes) ----------
-const BLEUS = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"];
-const SANS_DONNEE = "#e8e7e3";
+// ---------- Échelles de couleur : vert (bon marché / aisé) → rouge (cher / modeste) ----------
+const VERT_ROUGE = ["#1a9850", "#91cf60", "#d9ef8b", "#ffffbf", "#fee08b", "#fc8d59", "#d73027"];
+const SANS_DONNEE = "#bdbcb6";
 const ECHELLES = {
-  pa: { seuils: [3000, 4000, 5000, 6000, 7500, 10000], unite: "€/m²" },
-  pv: { seuils: [4000, 5000, 6000, 7000, 8500, 11000], unite: "€/m²" },
-  rv: { seuils: [15000, 18000, 21000, 24000, 28000, 33000], unite: "€" },
+  pa: { seuils: [3000, 4000, 5000, 6000, 7500, 10000], unite: "€/m²", couleurs: VERT_ROUGE },
+  pv: { seuils: [4000, 5000, 6000, 7000, 8500, 11000], unite: "€/m²", couleurs: VERT_ROUGE },
+  // Revenu : échelle inversée, vert = revenu élevé.
+  rv: { seuils: [15000, 18000, 21000, 24000, 28000, 33000], unite: "€", couleurs: [...VERT_ROUGE].reverse() },
 };
 const fmt = (n) => n == null ? "—" : Math.round(n).toLocaleString("fr-FR");
+const ENCRE = "#1f1f1f";
 
-// ---------- Pictogrammes dessinés sur canvas (aucune ressource externe) ----------
-const ENCRE = "#0b0b0b", FUTUR = getComputedStyle(document.documentElement).getPropertyValue("--futur").trim();
-function picto({ forme, texte, couleur, pointille }) {
-  const r = 2, w = forme === "rect" ? 34 : 24, h = 24, c = document.createElement("canvas");
-  c.width = w * r; c.height = h * r;
-  const x = c.getContext("2d"); x.scale(r, r);
-  x.lineWidth = 2; x.strokeStyle = couleur; x.fillStyle = "#ffffff";
-  if (pointille) x.setLineDash([3, 2]);
-  x.beginPath();
-  if (forme === "rond") x.arc(12, 12, 10, 0, 2 * Math.PI);
-  else if (forme === "carre") x.roundRect(2, 2, 20, 20, 3);
-  else x.roundRect(2, 3, 30, 18, 5);
-  x.fill(); x.stroke(); x.setLineDash([]);
-  x.fillStyle = couleur; x.textAlign = "center"; x.textBaseline = "middle";
-  x.font = `700 ${texte.length > 2 ? 10 : texte.length > 1 ? 10 : 13}px system-ui, sans-serif`;
-  x.fillText(texte, w / 2, 12.5);
-  return c;
-}
-const PICTOS = {
-  metro:       { forme: "rond",  texte: "M",   couleur: ENCRE, libelle: "Métro" },
-  rer:         { forme: "rect",  texte: "RER", couleur: ENCRE, libelle: "RER" },
-  transilien:  { forme: "carre", texte: "TN",  couleur: ENCRE, libelle: "Train Transilien" },
-  tram:        { forme: "rond",  texte: "T",   couleur: ENCRE, libelle: "Tramway" },
-  cable:       { forme: "rond",  texte: "C",   couleur: ENCRE, libelle: "Câble C1" },
-  metro_futur: { forme: "rond",  texte: "M",   couleur: FUTUR, pointille: true, libelle: "Grand Paris Express (futur)" },
-  tram_futur:  { forme: "rond",  texte: "T",   couleur: FUTUR, pointille: true, libelle: "Tramway (projet)" },
-  rer_futur:   { forme: "rect",  texte: "RER", couleur: FUTUR, pointille: true, libelle: "RER E (prolongement)" },
-};
 function hachure() {
   const r = 2, s = 9, c = document.createElement("canvas");
   c.width = s * r; c.height = s * r;
   const x = c.getContext("2d"); x.scale(r, r);
-  x.strokeStyle = "#1f1f1f"; x.lineWidth = 1.1; x.lineCap = "square";
+  x.strokeStyle = ENCRE; x.lineWidth = 1.1; x.lineCap = "square";
   for (const d of [-s, 0, s]) { x.beginPath(); x.moveTo(d, s); x.lineTo(d + s, 0); x.stroke(); }
   return c;
 }
@@ -165,21 +140,24 @@ function exprSelection() {
   return e;
 }
 function exprCouleur() {
-  const { seuils } = ECHELLES[etat.ind], pas = ["step", ["get", etat.ind], BLEUS[0]];
-  seuils.forEach((s, k) => pas.push(s, BLEUS[k + 1]));
+  const { seuils, couleurs } = ECHELLES[etat.ind], pas = ["step", ["get", etat.ind], couleurs[0]];
+  seuils.forEach((s, k) => pas.push(s, couleurs[k + 1]));
   return ["case", ["==", ["typeof", ["get", etat.ind]], "number"], pas, SANS_DONNEE];
 }
 
-// ---------- Carte ----------
+// ---------- Carte : fond Plan IGN (Géoplateforme, sans clé), désaturé ----------
+const IGN = "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0" +
+  "&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&TILEMATRIXSET=PM&FORMAT=image/png" +
+  "&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}";
 const carte = new maplibregl.Map({
   container: "carte",
   style: {
     version: 8,
-    sources: { fond: { type: "raster", tileSize: 256,
-      tiles: ["a", "b", "c", "d"].map((s) => `https://${s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png`),
-      attribution: "© OpenStreetMap contributors © CARTO" } },
+    sources: { fond: { type: "raster", tiles: [IGN], tileSize: 256, maxzoom: 18,
+                       attribution: "© IGN – Plan IGN v2 · données IDFM, INSEE, DVF, ANCT" } },
     layers: [{ id: "page", type: "background", paint: { "background-color": "#f4f3ef" } },
-             { id: "fond", type: "raster", source: "fond", paint: { "raster-opacity": 0.9 } }],
+             { id: "fond", type: "raster", source: "fond",
+               paint: { "raster-saturation": -0.85, "raster-opacity": 0.75, "raster-contrast": -0.1 } }],
   },
   center: [2.40, 48.86], zoom: 10.3, minZoom: 8.5, maxZoom: 17, attributionControl: { compact: true },
 });
@@ -189,52 +167,69 @@ carte.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right"
 const ventesGeo = { type: "FeatureCollection", features: DATA.ventes.map(([lng, lat, p, t, d, s, v]) => ({
   type: "Feature", geometry: { type: "Point", coordinates: [lng, lat] }, properties: { p, t, d, s, v } })) };
 
+// Épaisseur des tracés selon le mode et le zoom. MapLibre n'accepte le zoom qu'en tête
+// d'expression : la variation par mode se place donc dans chaque palier.
+const largeur = (marge) => ["interpolate", ["linear"], ["zoom"],
+  9, ["match", ["get", "m"], ["rer", "metro"], 1.6 + marge, 1.0 + marge],
+  13, ["match", ["get", "m"], ["rer", "metro"], 3.6 + marge, 2.4 + marge],
+  16, ["match", ["get", "m"], ["rer", "metro"], 6 + marge, 4 + marge]];
+// Rayon des points de station : plus grand pour une correspondance (x) ou une gare future.
+const rayon = (base, baseCorr) => ["interpolate", ["linear"], ["zoom"],
+  ...[[9, 0.45], [12, 0.8], [15, 1.3]].flatMap(([z, k]) =>
+    [z, baseCorr == null ? base * k : ["case", ["get", "x"], baseCorr * k, base * k]])];
+
 carte.on("load", () => {
-  for (const [nom, def] of Object.entries(PICTOS)) {
-    const c = picto(def);
-    carte.addImage(nom, c.getContext("2d").getImageData(0, 0, c.width, c.height), { pixelRatio: 2 });
-  }
   const h = hachure();
   carte.addImage("hachure", h.getContext("2d").getImageData(0, 0, h.width, h.height), { pixelRatio: 2 });
 
   carte.addSource("iris", { type: "geojson", data: DATA.iris });
   carte.addSource("communes", { type: "geojson", data: DATA.communes });
+  carte.addSource("lignes", { type: "geojson", data: DATA.lignes });
   carte.addSource("stations", { type: "geojson", data: DATA.stations });
   carte.addSource("ventes", { type: "geojson", data: ventesGeo });
 
+  // IRIS : seuls ceux qui passent les filtres sont colorés ; les autres restent transparents
+  // (mais survolables pour l'infobulle).
   carte.addLayer({ id: "iris", type: "fill", source: "iris",
-    paint: { "fill-color": exprCouleur(), "fill-opacity": ["case", exprSelection(), 0.8, 0.3] } });
-  carte.addLayer({ id: "iris-bord", type: "line", source: "iris", minzoom: 11,
-    paint: { "line-color": "#ffffff", "line-width": 0.6, "line-opacity": 0.8 } });
+    paint: { "fill-color": exprCouleur(), "fill-opacity": ["case", exprSelection(), 0.72, 0] } });
+  carte.addLayer({ id: "iris-bord", type: "line", source: "iris", minzoom: 11.5,
+    paint: { "line-color": "#8c8b85", "line-width": 0.4, "line-opacity": 0.6 } });
   carte.addLayer({ id: "iris-sel", type: "line", source: "iris", filter: exprSelection(),
-    paint: { "line-color": ENCRE, "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.4, 13, 1.2], "line-opacity": 0.55 } });
+    paint: { "line-color": "#ffffff", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.3, 13, 1.2] } });
   carte.addLayer({ id: "communes", type: "line", source: "communes",
-    paint: { "line-color": "#6b6a66", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.6, 13, 1.4] } });
+    paint: { "line-color": "#6b6a66", "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.5, 13, 1.2] } });
 
   if (DATA.qpv) {
     carte.addSource("qpv", { type: "geojson", data: DATA.qpv });
     carte.addSource("tampon", { type: "geojson", data: DATA.tampon });
-    carte.addLayer({ id: "qpv", type: "fill", source: "qpv", paint: { "fill-pattern": "hachure", "fill-opacity": 0.75 } });
-    carte.addLayer({ id: "qpv-bord", type: "line", source: "qpv", paint: { "line-color": "#1f1f1f", "line-width": 1.3 } });
+    carte.addLayer({ id: "qpv", type: "fill", source: "qpv", paint: { "fill-pattern": "hachure", "fill-opacity": 0.7 } });
+    carte.addLayer({ id: "qpv-bord", type: "line", source: "qpv", paint: { "line-color": ENCRE, "line-width": 1.2 } });
     carte.addLayer({ id: "tampon", type: "line", source: "tampon",
-      paint: { "line-color": "#1f1f1f", "line-width": 1.1, "line-dasharray": [3, 2] } });
+      paint: { "line-color": ENCRE, "line-width": 1, "line-dasharray": [3, 2] } });
   }
 
   carte.addLayer({ id: "ventes", type: "circle", source: "ventes", layout: { visibility: "none" },
     paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 15, 4.5],
-             "circle-color": ["step", ["get", "p"], BLEUS[0], 3000, BLEUS[1], 4000, BLEUS[2], 5000, BLEUS[3],
-                              6000, BLEUS[4], 7500, BLEUS[5], 10000, BLEUS[6]],
-             "circle-stroke-color": "#ffffff", "circle-stroke-width": 0.8 } });
+             "circle-color": ["step", ["get", "p"], VERT_ROUGE[0], 3000, VERT_ROUGE[1], 4000, VERT_ROUGE[2], 5000,
+                              VERT_ROUGE[3], 6000, VERT_ROUGE[4], 7500, VERT_ROUGE[5], 10000, VERT_ROUGE[6]],
+             "circle-stroke-color": "#ffffff", "circle-stroke-width": 0.6 } });
 
-  const taille = ["interpolate", ["linear"], ["zoom"], 9, 0.4, 11, 0.58, 13, 0.85, 15, 1.05];
-  const symboles = (id, modes, minzoom) => carte.addLayer({ id, type: "symbol", source: "stations", minzoom,
-    filter: ["in", ["get", "m"], ["literal", modes]],
-    layout: { "icon-image": ["get", "m"], "icon-size": taille, "icon-allow-overlap": true, "icon-ignore-placement": true,
-              "symbol-sort-key": ["match", ["get", "m"], "rer", 3, "metro", 2, 1] } });
-  symboles("st-leger", ["tram", "transilien", "cable"], 11);
-  symboles("st-rer", ["rer"], 9);
-  symboles("st-metro", ["metro"], 10.5);
-  symboles("st-futur", ["metro_futur", "tram_futur", "rer_futur"], 9);
+  // Tracés : liseré blanc puis couleur officielle ; métro et RER au-dessus.
+  const ordreTrace = ["match", ["get", "m"], "rer", 3, "metro", 2, 1];
+  carte.addLayer({ id: "lignes-lisere", type: "line", source: "lignes", layout: { "line-cap": "round", "line-sort-key": ordreTrace },
+    paint: { "line-color": "#ffffff", "line-width": largeur(1.5), "line-opacity": 0.85 } });
+  carte.addLayer({ id: "lignes", type: "line", source: "lignes", layout: { "line-cap": "round", "line-sort-key": ordreTrace },
+    paint: { "line-color": ["get", "c"], "line-width": largeur(0) } });
+
+  // Stations en service : point blanc cerclé de la couleur de la ligne ; correspondances cerclées de noir.
+  carte.addLayer({ id: "stations", type: "circle", source: "stations", filter: ["==", ["get", "e"], true],
+    paint: { "circle-radius": rayon(3.2, 4.2), "circle-color": "#ffffff",
+             "circle-stroke-color": ["case", ["get", "x"], ENCRE, ["get", "c"]],
+             "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 9, 1, 13, 1.8] } });
+  // Stations futures : anneau épais sombre avec cœur coloré, pour ne jamais les confondre.
+  carte.addLayer({ id: "futures", type: "circle", source: "stations", filter: ["==", ["get", "e"], false],
+    paint: { "circle-radius": rayon(5), "circle-color": ["get", "c"],
+             "circle-stroke-color": ENCRE, "circle-stroke-width": ["interpolate", ["linear"], ["zoom"], 9, 1.4, 13, 2.6] } });
 
   brancherControles();
   construireLegende();
@@ -245,10 +240,11 @@ carte.on("load", () => {
 const bulle = document.getElementById("infobulle");
 function contenu(f) {
   const p = f.properties, lay = f.layer.id;
-  if (lay.startsWith("st-")) {
-    const futur = lay === "st-futur";
-    return `<b>${p.n}</b><br>${PICTOS[p.m].libelle} — ${p.l}` + (futur ? `<br><span class="tag">${p.st}</span>` : "");
+  if (lay === "stations" || lay === "futures") {
+    const futur = lay === "futures";
+    return `<b>${p.n}</b><br>${p.l}` + (futur ? `<br><span class="tag">en projet · ${p.st}</span>` : "");
   }
+  if (lay === "lignes") return `<span class="puce" style="background:${p.c}"></span><b>${p.l}</b>`;
   if (lay === "ventes") return `<b>${fmt(p.p)} €/m²</b> — ${p.t === "a" ? "ancien" : "neuf (VEFA)"}<br>${fmt(p.v)} € · ${p.s} m² · ${p.d}`;
   if (lay === "qpv") return `<b>QPV ${p.n}</b><br>${p.cm} — ${p.c}`;
   const pct = (x) => x == null ? "—" : `${Math.round(x * 100)} %`;
@@ -265,7 +261,7 @@ function contenu(f) {
     </table>`;
 }
 carte.on("mousemove", (e) => {
-  const ordre = ["st-futur", "st-rer", "st-metro", "st-leger", "ventes", "qpv", "iris"].filter((l) => carte.getLayer(l));
+  const ordre = ["futures", "stations", "lignes", "ventes", "qpv", "iris"].filter((l) => carte.getLayer(l));
   const f = carte.queryRenderedFeatures(e.point, { layers: ordre })
     .sort((a, b) => ordre.indexOf(a.layer.id) - ordre.indexOf(b.layer.id))[0];
   carte.getCanvas().style.cursor = f ? "pointer" : "";
@@ -293,8 +289,8 @@ function brancherControles() {
   document.getElementById("indicateur").addEventListener("change", (e) => { etat.ind = e.target.value; mettreAJour(); construireLegende(); });
   const bascule = (id, couches) => document.getElementById(id).addEventListener("change", (e) =>
     couches.filter((l) => carte.getLayer(l)).forEach((l) => carte.setLayoutProperty(l, "visibility", e.target.checked ? "visible" : "none")));
-  bascule("c-st", ["st-rer", "st-metro", "st-leger"]);
-  bascule("c-fu", ["st-futur"]);
+  bascule("c-st", ["lignes-lisere", "lignes", "stations"]);
+  bascule("c-fu", ["futures"]);
   bascule("c-qpv", ["qpv", "qpv-bord", "tampon"]);
   bascule("c-ve", ["ventes"]);
   if (!DATA.qpv) { document.getElementById("c-qpv").disabled = true; document.getElementById("horsqpv").disabled = true; }
@@ -303,7 +299,7 @@ function brancherControles() {
 function mettreAJour() {
   const sel = exprSelection();
   carte.setPaintProperty("iris", "fill-color", exprCouleur());
-  carte.setPaintProperty("iris", "fill-opacity", ["case", sel, 0.8, 0.3]);
+  carte.setPaintProperty("iris", "fill-opacity", ["case", sel, 0.72, 0]);
   carte.setFilter("iris-sel", sel);
   const pc = DATA.iris.features.filter((f) => f.properties.dep !== "75");
   const parDep = {};
@@ -313,34 +309,40 @@ function mettreAJour() {
     ["92", "93", "94"].map((d) => `${d} : ${parDep[d] || 0}`).join(" · ");
 }
 
+function dessin(f) {
+  const c = document.createElement("canvas"), r = 2;
+  c.width = 28 * r; c.height = 20 * r;
+  const x = c.getContext("2d"); x.scale(r, r); f(x); return c;
+}
 function construireLegende() {
-  const { seuils, unite } = ECHELLES[etat.ind];
-  const lignes = BLEUS.map((c, k) => {
-    const txt = k === 0 ? `moins de ${fmt(seuils[0])}` : k === BLEUS.length - 1 ? `${fmt(seuils[k - 1])} et plus`
+  const { seuils, unite, couleurs } = ECHELLES[etat.ind];
+  const lignes = couleurs.map((c, k) => {
+    const txt = k === 0 ? `moins de ${fmt(seuils[0])}` : k === couleurs.length - 1 ? `${fmt(seuils[k - 1])} et plus`
       : `${fmt(seuils[k - 1])} – ${fmt(seuils[k])}`;
     return `<li><span class="pastille" style="background:${c}"></span>${txt} ${unite}</li>`;
   });
   lignes.push(`<li><span class="pastille" style="background:${SANS_DONNEE}"></span>Moins de 5 ventes / secret statistique</li>`);
+  lignes.push(`<li><span class="pastille" style="background:transparent"></span>Transparent = hors filtres</li>`);
   document.getElementById("leg-couleurs").innerHTML = lignes.join("");
 
-  if (document.getElementById("leg-symboles").childElementCount) return;
-  const img = (c) => `<img src="${c.toDataURL()}" alt="">`;
-  const h = hachure(), zone = document.createElement("canvas");
-  zone.width = 56; zone.height = 40;
-  const x = zone.getContext("2d");
-  x.fillStyle = x.createPattern(h, "repeat"); x.fillRect(2, 2, 52, 36);
-  x.strokeStyle = "#1f1f1f"; x.lineWidth = 2.6; x.strokeRect(2, 2, 52, 36);
-  const tir = document.createElement("canvas"); tir.width = 56; tir.height = 40;
-  const y = tir.getContext("2d"); y.strokeStyle = "#1f1f1f"; y.lineWidth = 2.2; y.setLineDash([6, 4]);
-  y.beginPath(); y.moveTo(2, 20); y.lineTo(54, 20); y.stroke();
-  const sel = document.createElement("canvas"); sel.width = 56; sel.height = 40;
-  const z = sel.getContext("2d"); z.fillStyle = BLEUS[3]; z.fillRect(2, 2, 52, 36);
-  z.strokeStyle = ENCRE; z.lineWidth = 2.4; z.strokeRect(2, 2, 52, 36);
-  const items = Object.values(PICTOS).map((d) => `<li>${img(picto(d))}${d.libelle}</li>`);
-  items.push(`<li>${img(zone)}Quartier prioritaire (QPV 2024)</li>`,
-             `<li>${img(tir)}Limite des 300 m autour d'un QPV</li>`,
-             `<li>${img(sel)}IRIS dans les filtres (contour foncé)</li>`);
-  document.getElementById("leg-symboles").innerHTML = items.join("");
+  const ul = document.getElementById("leg-symboles");
+  if (ul.childElementCount) return;
+  const item = (f, txt) => { const li = document.createElement("li"); li.append(dessin(f), txt); ul.append(li); };
+  item((x) => { x.lineCap = "round";
+    [["#eb2132", 5], ["#5091cb", 10], ["#ffbe00", 15]].forEach(([c, y]) => { x.strokeStyle = c; x.lineWidth = 3;
+      x.beginPath(); x.moveTo(2, y); x.lineTo(26, y); x.stroke(); }); },
+    "Ligne en service (couleur officielle : RER, métro, tram, Transilien, câble)");
+  item((x) => { x.strokeStyle = "#5091cb"; x.lineWidth = 3; x.beginPath(); x.moveTo(0, 10); x.lineTo(28, 10); x.stroke();
+    x.fillStyle = "#fff"; x.strokeStyle = "#5091cb"; x.lineWidth = 1.8; x.beginPath(); x.arc(14, 10, 3.5, 0, 7); x.fill(); x.stroke(); },
+    "Station (cerclée de la couleur de sa ligne)");
+  item((x) => { x.fillStyle = "#fff"; x.strokeStyle = ENCRE; x.lineWidth = 1.8; x.beginPath(); x.arc(14, 10, 4.5, 0, 7); x.fill(); x.stroke(); },
+    "Station de correspondance");
+  item((x) => { x.fillStyle = "#555555"; x.strokeStyle = ENCRE; x.lineWidth = 2.6; x.beginPath(); x.arc(14, 10, 5.5, 0, 7); x.fill(); x.stroke(); },
+    "Gare ou station future (GPE, tram, RER E) — pas de tracé publié");
+  item((x) => { x.fillStyle = x.createPattern(hachure(), "repeat"); x.fillRect(2, 2, 24, 16);
+    x.strokeStyle = ENCRE; x.lineWidth = 1.4; x.strokeRect(2, 2, 24, 16); }, "Quartier prioritaire (QPV 2024)");
+  item((x) => { x.strokeStyle = ENCRE; x.lineWidth = 1.4; x.setLineDash([3, 2]); x.beginPath(); x.moveTo(2, 10); x.lineTo(26, 10); x.stroke(); },
+    "Limite des 300 m autour d'un QPV");
 }
 
 document.getElementById("periode").textContent =
