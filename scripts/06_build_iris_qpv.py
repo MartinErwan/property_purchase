@@ -19,11 +19,12 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
+from zone import DEPARTEMENTS
+
 ROOT = Path(__file__).resolve().parents[1]
 RAW = ROOT / "data" / "raw"
 OUT = ROOT / "data" / "processed"
 
-DEPARTEMENTS = ["75", "92", "93", "94"]
 TAMPON_QPV_M = 300
 
 

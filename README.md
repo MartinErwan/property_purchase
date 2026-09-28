@@ -1,4 +1,4 @@
-# Carte de sélection de quartiers — petite couronne
+# Carte de sélection de quartiers — Île-de-France
 
 Pipeline reproductible qui croise prix réels (DVF), transports (IDFM), revenus (Filosofi) et QPV
 par IRIS, et exporte une carte interactive HTML ainsi que des fichiers pour QGIS et Kepler.gl. Contexte et règles : voir `CLAUDE.md`.
@@ -7,7 +7,7 @@ par IRIS, et exporte une carte interactive HTML ainsi que des fichiers pour QGIS
 
 ```bash
 uv sync
-uv run python scripts/01_download_dvf.py         # DVF géolocalisées 75/92/93/94, 2021-2025
+uv run python scripts/01_download_dvf.py         # DVF géolocalisées, 8 départements, 2021-2025
 uv run python scripts/02_clean_dvf.py            # ventes d'appartements + prix/m²
 uv run python scripts/03_download_transports.py  # gares IDFM actuelles + projets (GPE…)
 uv run python scripts/04_build_transports.py     # couche transports typée par mode
@@ -43,7 +43,9 @@ Colonnes principales de `iris_indicateurs` : `prix_m2_median_{ancien,vefa}_24m` 
   légèrement surestimé) ; valeurs aberrantes = prix/m² hors [0,3 ; 3] × médiane communale.
 - **Médianes** calculées à partir de 5 ventes ; sinon NaN (repère communal fourni).
 - **Distances** à vol d'oiseau depuis le centre de l'IRIS, pas de distance réseau piéton.
-- **GPE** : pas de date de mise en service (absente de l'open data) ; `statut` et `phase` IDFM.
+- **Projets de transport** (GPE 15 à 18, tram, RER E) : tracés, couleurs et dates de mise en service
+  **estimées par IDFM** (jeu `projets_lignes_idf`) ; ce sont des prévisions, susceptibles de glisser.
+- **Zone** : les 8 départements d'Île-de-France (liste dans `scripts/zone.py`).
 - **Revenus** : Filosofi 2021 (dernier millésime, 2022 non produit par l'INSEE). Valeurs
   secrétisées laissées à NaN ; 7 communes non irisées → médiane communale (`source_revenu`).
 - **Budget** : frais de notaire non inclus ; surface cible par défaut 45 m² (hypothèse).

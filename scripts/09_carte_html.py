@@ -22,6 +22,8 @@ import geopandas as gpd
 import pandas as pd
 import requests
 
+from zone import DEPARTEMENTS
+
 ROOT = Path(__file__).resolve().parents[1]
 EXPORT = ROOT / "data" / "exports"
 VENDOR = ROOT / "data" / "raw" / "vendor" / "maplibre-gl-4.7.1"
@@ -94,20 +96,22 @@ def preparer() -> dict:
     s = (s.groupby("cle", as_index=False)
           .agg(nom=("nom", "first"), lignes=("ligne", lambda x: ", ".join(sorted(set(x)))),
                n_lignes=("ligne", "nunique"), couleur=("couleur", "first"), statut=("statut", "first"),
-               existant=("existant", "first"), geometry=("geometry", "first")))
+               mise_en_service=("mise_en_service", "first"), existant=("existant", "first"),
+               geometry=("geometry", "first")))
     s["correspondance"] = s["n_lignes"] > 1
     s = gpd.GeoDataFrame(s, geometry="geometry", crs="EPSG:2154")
     stations = geojson(s, {"nom": "n", "lignes": "l", "couleur": "c", "statut": "st", "existant": "e",
-                           "correspondance": "x"})
+                           "correspondance": "x", "mise_en_service": "ms"})
 
     lg = gpd.read_file(gpkg, layer="lignes")
     lg["geometry"] = lg.geometry.simplify(SIMPLIFICATION_M)
-    lignes = geojson(lg, {"ligne": "l", "mode": "m", "couleur": "c"})
+    lignes = geojson(lg, {"ligne": "l", "mode": "m", "couleur": "c", "existant": "e", "statut": "st",
+                          "projet": "p", "mise_en_service": "ms"})
 
     # Valeurs initiales des filtres = paramètres utilisés par le script 08 (texte de la colonne `parametres`).
     budget_ancien, budget_vefa, surface, dist_max, revenu_min = map(
         float, re.findall(r"\d+(?:\.\d+)?", i["parametres"].iloc[0]))
-    donnees = {"iris": iris, "communes": communes, "stations": stations, "lignes": lignes,
+    donnees = {"iris": iris, "communes": communes, "stations": stations, "lignes": lignes, "departements": DEPARTEMENTS,
                "periode": i["periode_24m"].iloc[0],
                "defauts": {"budget_ancien": budget_ancien, "budget_vefa": budget_vefa, "surface": surface,
                            "dist_max": dist_max, "revenu_min": revenu_min}}

@@ -110,7 +110,7 @@ def main() -> None:
     exporter_fichiers(couches)
 
     pc = iris[iris["code_departement"] != "75"]
-    print(f"IRIS de petite couronne sélectionnés : {int(pc['selection'].sum())} / {len(pc)} "
+    print(f"IRIS hors Paris sélectionnés : {int(pc['selection'].sum())} / {len(pc)} "
           f"({pc['parametres'].iloc[0]})")
 
 

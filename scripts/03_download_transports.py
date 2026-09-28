@@ -3,9 +3,11 @@
 - emplacement-des-gares-idf : gares et stations actuelles, une ligne par couple gare × ligne
   (métro, RER, Transilien, tram, VAL, câble).
 - projets_arrets_idf : gares et arrêts en projet (dont Grand Paris Express, lignes 15 à 18),
-  avec statut d'avancement mais SANS date de mise en service.
+  avec statut d'avancement ; la date de mise en service vient de projets_lignes_idf.
 - traces-du-reseau-ferre-idf : tracés des lignes en service, avec la couleur officielle de chaque
-  ligne (colourweb_hexa). Pas de tracé pour les lignes en projet.
+  ligne (colourweb_hexa).
+- projets_lignes_idf : tracés des lignes en projet (GPE 15 à 18, prolongements de tram, RER E),
+  couleur officielle (rvb) et date de mise en service estimée par IDFM (mes_estime, mes_off_tx).
 
 Les jeux de la Société des grands projets sur data.gouv.fr datent de 2015-2017 et ne donnent
 pas de dates de mise en service : non utilisés.
@@ -18,7 +20,7 @@ from pathlib import Path
 import requests
 
 API = "https://data.iledefrance-mobilites.fr/api/explore/v2.1/catalog/datasets"
-DATASETS = ["emplacement-des-gares-idf", "projets_arrets_idf", "traces-du-reseau-ferre-idf"]
+DATASETS = ["emplacement-des-gares-idf", "projets_arrets_idf", "traces-du-reseau-ferre-idf", "projets_lignes_idf"]
 RAW_DIR = Path(__file__).resolve().parents[1] / "data" / "raw" / "transports"
 
 

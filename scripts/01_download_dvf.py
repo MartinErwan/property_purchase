@@ -4,7 +4,7 @@ Source : https://files.data.gouv.fr/geo-dvf/latest/csv/<année>/departements/<de
 Les fichiers sont stockés tels quels (compressés) dans data/raw/dvf/.
 
 Usage :
-    uv run python scripts/01_download_dvf.py                 # 75, 92, 93, 94 × 2021-2025
+    uv run python scripts/01_download_dvf.py                 # 8 départements d'IDF × 2021-2025
     uv run python scripts/01_download_dvf.py --deps 92 --years 2024
 """
 
@@ -13,10 +13,12 @@ from pathlib import Path
 
 import requests
 
+from zone import DEPARTEMENTS
+
 BASE_URL = "https://files.data.gouv.fr/geo-dvf/latest/csv"
 RAW_DIR = Path(__file__).resolve().parents[1] / "data" / "raw" / "dvf"
 
-DEFAULT_DEPS = ["75", "92", "93", "94"]
+DEFAULT_DEPS = list(DEPARTEMENTS)
 DEFAULT_YEARS = [2021, 2022, 2023, 2024, 2025]
 
 

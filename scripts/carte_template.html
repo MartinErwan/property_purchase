@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quartiers petite couronne</title>
+<title>Quartiers Île-de-France</title>
 <style>/*__MAPLIBRE_CSS__*/</style>
 <style>
   :root {
@@ -58,7 +58,7 @@
 <body>
 <div id="app">
   <aside id="panneau">
-    <h1>Où acheter en petite couronne</h1>
+    <h1>Où acheter en Île-de-France</h1>
     <p class="sous-titre" id="periode"></p>
 
     <h2>Couleur des IRIS retenus</h2>
@@ -95,8 +95,8 @@
     <p class="note">
       Seuls les IRIS qui passent les filtres sont colorés. Prix médian calculé à partir de 5 ventes
       (DVF, appartements, dépendances incluses) ; budget hors frais de notaire. Distances à vol d'oiseau.
-      Revenus : Filosofi 2021 (INSEE). Transports : IDFM (couleurs officielles des lignes ; pas de tracé
-      publié pour les lignes du Grand Paris Express). QPV 2024 : ANCT. Le tampon de 300 m est le périmètre
+      Revenus : Filosofi 2021 (INSEE). Transports : IDFM (couleurs officielles des lignes ; dates de mise
+      en service des projets estimées par IDFM). QPV 2024 : ANCT. Le tampon de 300 m est le périmètre
       de TVA à 5,5 % en accession (conditions de ressources, non vérifiées ici). Fond : Plan IGN.
     </p>
   </aside>
@@ -123,6 +123,7 @@ const ECHELLES = {
   // Revenu : échelle inversée, vert = revenu élevé.
   rv: { seuils: [15000, 18000, 21000, 24000, 28000, 33000], unite: "€", couleurs: [...VERT_ROUGE].reverse() },
 };
+const DEPARTEMENTS = DATA.departements;
 const fmt = (n) => n == null ? "—" : Math.round(n).toLocaleString("fr-FR");
 const ENCRE = "#1f1f1f";
 
@@ -175,7 +176,7 @@ const carte = new maplibregl.Map({
              { id: "fond", type: "raster", source: "fond",
                paint: { "raster-saturation": -0.85, "raster-opacity": 0.75, "raster-contrast": -0.1 } }],
   },
-  center: [2.40, 48.86], zoom: 10.3, minZoom: 8.5, maxZoom: 17, attributionControl: { compact: true },
+  center: [2.45, 48.80], zoom: 9.2, minZoom: 7.5, maxZoom: 17, attributionControl: { compact: true },
 });
 carte.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
 carte.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
@@ -215,11 +216,12 @@ carte.on("load", () => {
     paint: { "line-color": "#5c5b57", "line-width": ["interpolate", ["linear"], ["zoom"], 11, 0.3, 13, 0.8, 16, 1.4],
              "line-opacity": ["interpolate", ["linear"], ["zoom"], 11, 0, 12, 0.75] } });
   // Limites de commune : trait sombre sur liseré blanc, épaississant avec le zoom.
-  const epCommune = (marge) => ["interpolate", ["linear"], ["zoom"], 9, 0.6 + marge, 12, 1.6 + marge, 15, 2.6 + marge];
+  const epCommune = (marge) => ["interpolate", ["linear"], ["zoom"], 8, 0.25 + marge, 10, 0.6 + marge, 12, 1.6 + marge, 15, 2.6 + marge];
   carte.addLayer({ id: "communes-lisere", type: "line", source: "communes", minzoom: 11,
     layout: { "line-join": "round" }, paint: { "line-color": "#ffffff", "line-width": epCommune(2), "line-opacity": 0.85 } });
   carte.addLayer({ id: "communes", type: "line", source: "communes",
-    layout: { "line-join": "round" }, paint: { "line-color": "#3d3c38", "line-width": epCommune(0) } });
+    layout: { "line-join": "round" }, paint: { "line-color": "#3d3c38", "line-width": epCommune(0),
+      "line-opacity": ["interpolate", ["linear"], ["zoom"], 8, 0.35, 11, 1] } });
   // Quartier survolé : contour souligné.
   carte.addLayer({ id: "iris-survol", type: "line", source: "iris", filter: ["==", ["get", "id"], ""],
     paint: { "line-color": "#2a78d6", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 15, 3] } });
@@ -245,11 +247,22 @@ carte.on("load", () => {
                               VERT_ROUGE[3], 6000, VERT_ROUGE[4], 7500, VERT_ROUGE[5], 10000, VERT_ROUGE[6]],
              "circle-stroke-color": "#ffffff", "circle-stroke-width": 0.6 } });
 
-  // Tracés : liseré blanc puis couleur officielle ; métro et RER au-dessus.
+  // Tracés en projet : couleur officielle en tirets, sous les lignes en service.
+  const enService = ["==", ["get", "e"], true];
+  carte.addLayer({ id: "lignes-futures-lisere", type: "line", source: "lignes", filter: ["!", enService],
+    paint: { "line-color": "#ffffff", "line-opacity": 0.85,
+             "line-width": ["interpolate", ["linear"], ["zoom"], 9, 3, 13, 5, 16, 7.5] } });
+  carte.addLayer({ id: "lignes-futures", type: "line", source: "lignes", filter: ["!", enService],
+    paint: { "line-color": ["get", "c"], "line-dasharray": [2, 1.2],
+             "line-width": ["interpolate", ["linear"], ["zoom"], 9, 1.6, 13, 3.2, 16, 5] } });
+
+  // Tracés en service : liseré blanc puis couleur officielle ; métro et RER au-dessus.
   const ordreTrace = ["match", ["get", "m"], "rer", 3, "metro", 2, 1];
-  carte.addLayer({ id: "lignes-lisere", type: "line", source: "lignes", layout: { "line-cap": "round", "line-sort-key": ordreTrace },
+  carte.addLayer({ id: "lignes-lisere", type: "line", source: "lignes", filter: enService,
+    layout: { "line-cap": "round", "line-sort-key": ordreTrace },
     paint: { "line-color": "#ffffff", "line-width": largeur(1.5), "line-opacity": 0.85 } });
-  carte.addLayer({ id: "lignes", type: "line", source: "lignes", layout: { "line-cap": "round", "line-sort-key": ordreTrace },
+  carte.addLayer({ id: "lignes", type: "line", source: "lignes", filter: enService,
+    layout: { "line-cap": "round", "line-sort-key": ordreTrace },
     paint: { "line-color": ["get", "c"], "line-width": largeur(0) } });
 
   // Stations en service : point blanc cerclé de la couleur de la ligne ; correspondances cerclées de noir.
@@ -273,9 +286,12 @@ function contenu(f) {
   const p = f.properties, lay = f.layer.id;
   if (lay === "stations" || lay === "futures") {
     const futur = lay === "futures";
-    return `<b>${p.n}</b><br>${p.l}` + (futur ? `<br><span class="tag">en projet · ${p.st}</span>` : "");
+    return `<b>${p.n}</b><br>${p.l}` +
+      (futur ? `<br><span class="tag">mise en service prévue : ${p.ms ?? "inconnue"}</span> <span class="tag">${p.st}</span>` : "");
   }
   if (lay === "lignes") return `<span class="puce" style="background:${p.c}"></span><b>${p.l}</b>`;
+  if (lay === "lignes-futures") return `<span class="puce" style="background:${p.c}"></span><b>${p.l}</b> (en projet)<br>${p.p}` +
+    `<br><span class="tag">mise en service prévue : ${p.ms ?? "inconnue"}</span> <span class="tag">${p.st}</span>`;
   if (lay === "ventes") return `<b>${fmt(p.p)} €/m²</b> — ${p.t === "a" ? "ancien" : "neuf (VEFA)"}<br>${fmt(p.v)} € · ${p.s} m² · ${p.d}`;
   if (lay === "qpv") return `<b>QPV ${p.n}</b><br>${p.cm} — ${p.c}`;
   const pct = (x) => x == null ? "—" : `${Math.round(x * 100)} %`;
@@ -292,7 +308,7 @@ function contenu(f) {
     </table>`;
 }
 carte.on("mousemove", (e) => {
-  const ordre = ["futures", "stations", "lignes", "ventes", "qpv", "iris"].filter((l) => carte.getLayer(l));
+  const ordre = ["futures", "stations", "lignes", "lignes-futures", "ventes", "qpv", "iris"].filter((l) => carte.getLayer(l));
   const f = carte.queryRenderedFeatures(e.point, { layers: ordre })
     .sort((a, b) => ordre.indexOf(a.layer.id) - ordre.indexOf(b.layer.id))[0];
   carte.getCanvas().style.cursor = f ? "pointer" : "";
@@ -324,7 +340,7 @@ function brancherControles() {
   const bascule = (id, couches) => document.getElementById(id).addEventListener("change", (e) =>
     couches.filter((l) => carte.getLayer(l)).forEach((l) => carte.setLayoutProperty(l, "visibility", e.target.checked ? "visible" : "none")));
   bascule("c-st", ["lignes-lisere", "lignes", "stations"]);
-  bascule("c-fu", ["futures"]);
+  bascule("c-fu", ["futures", "lignes-futures", "lignes-futures-lisere"]);
   bascule("c-qpv", ["qpv", "qpv-bord", "tampon"]);
   bascule("c-ve", ["ventes"]);
   if (!DATA.qpv) { document.getElementById("c-qpv").disabled = true; document.getElementById("horsqpv").disabled = true; }
@@ -336,11 +352,12 @@ function mettreAJour() {
   carte.setPaintProperty("iris", "fill-opacity", ["case", sel, 0.72, 0]);
   carte.setFilter("iris-sel", sel);
   const pc = DATA.iris.features.filter((f) => f.properties.dep !== "75");
+  const deps = Object.keys(DEPARTEMENTS).filter((d) => d !== "75");
   const parDep = {};
   for (const f of pc) if (estSelectionne(f.properties)) parDep[f.properties.dep] = (parDep[f.properties.dep] || 0) + 1;
   const total = Object.values(parDep).reduce((a, b) => a + b, 0);
-  document.getElementById("compte").innerHTML = `<b>${total}</b> IRIS de petite couronne sur ${pc.length} dans les filtres<br>` +
-    ["92", "93", "94"].map((d) => `${d} : ${parDep[d] || 0}`).join(" · ");
+  document.getElementById("compte").innerHTML = `<b>${total}</b> IRIS hors Paris sur ${pc.length} dans les filtres<br>` +
+    deps.map((d) => `${d} : ${parDep[d] || 0}`).join(" · ");
 }
 
 function dessin(f) {
@@ -371,8 +388,11 @@ function construireLegende() {
     "Station (cerclée de la couleur de sa ligne)");
   item((x) => { x.fillStyle = "#fff"; x.strokeStyle = ENCRE; x.lineWidth = 1.8; x.beginPath(); x.arc(14, 10, 4.5, 0, 7); x.fill(); x.stroke(); },
     "Station de correspondance");
-  item((x) => { x.fillStyle = "#555555"; x.strokeStyle = ENCRE; x.lineWidth = 2.6; x.beginPath(); x.arc(14, 10, 5.5, 0, 7); x.fill(); x.stroke(); },
-    "Gare ou station future (GPE, tram, RER E) — pas de tracé publié");
+  item((x) => { x.setLineDash([4, 2.4]); x.lineWidth = 3;
+    [["#a50034", 6], ["#ff82b4", 14]].forEach(([c, y]) => { x.strokeStyle = c; x.beginPath(); x.moveTo(2, y); x.lineTo(26, y); x.stroke(); }); },
+    "Ligne en projet (GPE 15 à 18, tram, RER E) en tirets, couleur officielle");
+  item((x) => { x.fillStyle = "#a50034"; x.strokeStyle = ENCRE; x.lineWidth = 2.6; x.beginPath(); x.arc(14, 10, 5.5, 0, 7); x.fill(); x.stroke(); },
+    "Gare ou station future (date de mise en service au survol)");
   item((x) => { x.strokeStyle = "#ffffff"; x.lineWidth = 4; x.beginPath(); x.moveTo(2, 10); x.lineTo(26, 10); x.stroke();
     x.strokeStyle = "#3d3c38"; x.lineWidth = 2; x.beginPath(); x.moveTo(2, 10); x.lineTo(26, 10); x.stroke(); },
     "Limite de commune");
@@ -388,7 +408,6 @@ function construireLegende() {
 // Normalisation : sans accents ni casse, tirets et apostrophes = espaces, « st »/« ste » = saint/sainte.
 const normaliser = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
   .replace(/[-'’]/g, " ").replace(/\bste\b/g, "sainte").replace(/\bst\b/g, "saint").replace(/\s+/g, " ").trim();
-const DEPARTEMENTS = { "75": "Paris", "92": "Hauts-de-Seine", "93": "Seine-Saint-Denis", "94": "Val-de-Marne" };
 const COMMUNES = DATA.communes.features.map((f) => {
   const pts = f.geometry.type === "LineString" ? f.geometry.coordinates : f.geometry.coordinates.flat();
   const lng = pts.map((p) => p[0]), lat = pts.map((p) => p[1]);

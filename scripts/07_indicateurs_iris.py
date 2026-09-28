@@ -86,10 +86,10 @@ def indicateurs_distances(iris: gpd.GeoDataFrame) -> pd.DataFrame:
     j = gpd.sjoin_nearest(pts, actuelles, distance_col="d").drop_duplicates("code_iris").set_index("code_iris")
     out["dist_station_actuelle_m"] = j["d"].round()
     out["station_actuelle_proche"] = j["nom"] + " (" + j["ligne"] + ")"
-    futures = t[~t["existant"]][["nom", "ligne", "geometry"]]
+    futures = t[~t["existant"]][["nom", "ligne", "mise_en_service", "geometry"]]
     j = gpd.sjoin_nearest(pts, futures, distance_col="d").drop_duplicates("code_iris").set_index("code_iris")
     out["dist_station_future_m"] = j["d"].round()
-    out["station_future_proche"] = j["nom"] + " (" + j["ligne"] + ")"
+    out["station_future_proche"] = j["nom"] + " (" + j["ligne"] + ", " + j["mise_en_service"].fillna("date inconnue") + ")"
     return out
 
 
@@ -101,7 +101,12 @@ def indicateurs_qpv(iris: gpd.GeoDataFrame) -> pd.DataFrame:
             out[col] = float("nan")
             continue
         zone = gpd.read_parquet(chemin).union_all()
-        out[col] = (iris.geometry.intersection(zone).area / iris.geometry.area).round(3).to_numpy()
+        # Intersection calculée seulement pour les IRIS qui touchent la zone (index spatial) : les autres valent 0.
+        part = pd.Series(0.0, index=iris.index)
+        touche = iris.geometry.intersects(zone)
+        g = iris.geometry[touche]
+        part[touche] = g.intersection(zone).area / g.area
+        out[col] = part.round(3).to_numpy()
     return out
 
 
