@@ -114,7 +114,9 @@ def preparer() -> dict:
     s["correspondance"] = s["n_lignes"] > 1
     # Ligne de la station dans la matrice des temps de trajet (stations en service uniquement).
     st_trajet = gpd.read_parquet(PROC / "stations_trajet.parquet")
-    s["k"] = s["cle"].map(dict(zip(st_trajet["id_ref_zdc"].astype(str), st_trajet.index))).astype("Int64")
+    # Gares futures du GPE : ligne « gpe:<nom> » de la matrice (utilisée seulement avec l'option GPE).
+    lignes_matrice = dict(zip(st_trajet["id_ref_zdc"].astype(str), st_trajet.index))
+    s["k"] = s["cle"].map(lambda c: lignes_matrice.get(c, lignes_matrice.get(c.replace("futur:", "gpe:", 1)))).astype("Int64")
     s = gpd.GeoDataFrame(s, geometry="geometry", crs="EPSG:2154")
     stations = geojson(s, {"nom": "n", "lignes": "l", "couleur": "c", "statut": "st", "existant": "e",
                            "correspondance": "x", "mise_en_service": "ms", "k": "k"})
@@ -158,9 +160,10 @@ def trajet(st_trajet: gpd.GeoDataFrame) -> dict:
     defaut = poles.index[poles["stations"].str.split(" / ").map(lambda x: DESTINATION_DEFAUT in x)][0]
     return {
         "matrice": base64.b64encode(matrice.tobytes()).decode(),
+        "matrice_gpe": base64.b64encode(np.load(PROC / "temps_trajet_gpe.npy").tobytes()).decode(),
         "poles": [{"n": n, "s": s, "d": bool(d), "c": [round(g.x, DECIMALES), round(g.y, DECIMALES)]}
                   for n, s, d, g in zip(poles["nom"], poles["stations"], poles["desservi"], poles.geometry)],
-        "stations": st_trajet["nom"].tolist(),
+        "stations": (st_trajet["nom"] + st_trajet["gpe"].map({True: " (GPE)", False: ""})).tolist(),
         "pole_defaut": int(defaut),
     }
 

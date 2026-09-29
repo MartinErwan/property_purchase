@@ -47,6 +47,12 @@ Colonnes principales de `iris_indicateurs` : `prix_m2_median_{ancien,vefa}_24m` 
 - **Projets de transport** (GPE 15 à 18, tram, RER E) : tracés, couleurs et dates de mise en service
   **estimées par IDFM** (jeu `projets_lignes_idf`) ; ce sont des prévisions, susceptibles de glisser.
 - **Zone** : les 8 départements d'Île-de-France (liste dans `scripts/zone.py`).
+- **Temps de trajet** (`scripts/08_temps_trajet.py`) : horaires GTFS IDFM d'un mardi ordinaire, arrivée
+  entre 8 h 30 et 9 h 15 (moyenne de 4 heures), métro/RER/Transilien/TER/tram/câble, correspondances
+  officielles ; marche vers la station à vol d'oiseau × 1,3 à 4,5 km/h. Bus non comptés.
+- **Option « avec Grand Paris Express »** : horaires fictifs (hypothèses non vérifiées) — un train toutes
+  les 3 min, 55 km/h (ligne 15) ou 65 km/h (16, 17, 18) de vitesse commerciale sur le tracé IDFM,
+  2 min de profondeur en correspondance ; toutes les lignes supposées ouvertes.
 - **Revenus** : Filosofi 2021 (dernier millésime, 2022 non produit par l'INSEE). Valeurs
   secrétisées laissées à NaN ; 7 communes non irisées → médiane communale (`source_revenu`).
 - **Budget** : frais de notaire non inclus ; surface cible par défaut 45 m² (hypothèse).

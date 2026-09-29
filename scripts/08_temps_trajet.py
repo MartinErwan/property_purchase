@@ -7,6 +7,7 @@ Sorties : data/processed/stations_trajet.parquet  une ligne par station de la ca
                                                   avec le pôle auquel elle appartient
           data/processed/poles_trajet.parquet     une ligne par pôle de destination
           data/processed/temps_trajet.npy         matrice stations × pôles (minutes, uint8 ; 255 = injoignable)
+          data/processed/temps_trajet_gpe.npy     idem en ajoutant les lignes 15 à 18 du Grand Paris Express
           data/processed/iris_stations_trajet.parquet  pour chaque IRIS, les stations accessibles à pied
                                                   (jusqu'à N_STATIONS_IRIS, à moins de MARCHE_MAX_M) et le temps de marche
 
@@ -26,7 +27,12 @@ Méthode (Connection Scan Algorithm à rebours) :
 - Marche IRIS → station : distance à vol d'oiseau depuis le point de référence de l'IRIS
   × DETOUR, à VITESSE_MARCHE_M_MIN. Le temps IRIS → destination (calculé dans la carte) est le
   minimum sur ces stations de (marche + trajet).
-- Les lignes en projet (GPE…) ne sont pas dans les horaires : non prises en compte.
+- Grand Paris Express (variante « avec GPE », hypothèses non vérifiées) : les lignes 15 à 18 n'ont
+  pas d'horaires ; on leur crée des circulations fictives sur leur tracé IDFM (projets_lignes_idf),
+  une toutes les GPE_INTERVALLE_S, à GPE_VITESSE_KMH de vitesse commerciale (arrêts compris),
+  distance mesurée le long du tracé. Toutes les lignes sont supposées ouvertes (horizon ~2031).
+  Correspondance avec le réseau existant : marche (× DETOUR) + GPE_PROFONDEUR_S (gares profondes).
+  Les gares du GPE deviennent aussi des stations de départ pour les IRIS voisins.
 """
 
 import time
@@ -58,6 +64,14 @@ POLE_S = 360
 TYPES_ROUTES = (0, 1, 2, 6)            # tram, métro, train (RER/Transilien/TER), câble
 EXCLUES = ("CDG VAL", "ORLYVAL")
 INJOIGNABLE = 255
+GPE_LIGNES = ["METRO 15", "METRO 16", "METRO 17", "METRO 18"]
+GPE_VITESSE_KMH = {"METRO 15": 55, "METRO 16": 65, "METRO 17": 65, "METRO 18": 65}
+GPE_INTERVALLE_S = 180
+GPE_PROFONDEUR_S = 120
+GPE_CORRESPONDANCE_M = 400
+GPE_CORRESPONDANCE_INTERNE_S = 180     # entre deux lignes du GPE dans une même gare
+GPE_ACCROCHE_M = 200                   # distance max d'une gare à son tracé
+N_GARES_GPE_IRIS = 3
 MARCHE_MAX_M = 2500
 N_STATIONS_IRIS = 6
 DETOUR = 1.3
@@ -212,8 +226,116 @@ def csa_rebours(c_dep, c_arr, c_dep_q, c_arr_q, c_trip, c_montee, c_descente, n_
     return np.array(depart_max)
 
 
+def troncons_gpe(gares: gpd.GeoDataFrame) -> list[tuple[str, str, str, float]]:
+    """Liens (ligne, gare a, gare b, longueur en m) entre gares consécutives le long des tracés IDFM."""
+    traces = gpd.read_parquet(PROC / "lignes.parquet")
+    traces = traces[~traces["existant"] & traces["ligne"].isin(GPE_LIGNES)].explode(index_parts=False)
+    liens = {}
+    for ligne, geom in zip(traces["ligne"], traces.geometry):
+        g = gares[(gares["ligne"] == ligne) & (gares.distance(geom) <= GPE_ACCROCHE_M)]
+        positions = sorted((geom.project(pt), nom) for nom, pt in zip(g["nom"], g.geometry))
+        for (pa, a), (pb, b) in zip(positions, positions[1:]):
+            if a != b:
+                cle = (ligne, *sorted((a, b)))
+                liens[cle] = min(liens.get(cle, float("inf")), pb - pa)
+    return [(l, a, b, d) for (l, a, b), d in liens.items()]
+
+
+def parcours(liens: list[tuple[str, str, float]]) -> list[list[tuple[str, float]]]:
+    """Découpe le graphe d'une ligne en parcours (gare, abscisse) entre terminus / embranchements."""
+    voisins: dict[str, dict[str, float]] = {}
+    for a, b, d in liens:
+        voisins.setdefault(a, {})[b] = d
+        voisins.setdefault(b, {})[a] = d
+    vus, res = set(), []
+    departs = [n for n, v in voisins.items() if len(v) != 2] or [next(iter(voisins))]  # boucle pure
+    for n0 in departs:
+        for n1 in voisins[n0]:
+            if (n0, n1) in vus:
+                continue
+            chemin, x, prec, pos = [(n0, 0.0)], n1, n0, 0.0
+            while True:
+                vus.update({(prec, x), (x, prec)})
+                pos += voisins[prec][x]
+                chemin.append((x, pos))
+                suivants = [y for y in voisins[x] if y != prec and (x, y) not in vus]
+                if len(voisins[x]) != 2 or not suivants:
+                    break
+                prec, x = x, suivants[0]
+            res.append(chemin)
+    return res
+
+
+def reseau_gpe(quais_existants: gpd.GeoDataFrame) -> tuple[pd.DataFrame, gpd.GeoDataFrame, pd.DataFrame]:
+    """Circulations fictives du GPE, gares du GPE (une par nom) et cheminements vers le réseau existant."""
+    t = gpd.read_parquet(PROC / "transports.parquet")
+    gares = t[(~t["existant"]) & t["ligne"].isin(GPE_LIGNES)][["nom", "ligne", "geometry"]]
+    lignes_liens: dict[str, list] = {}
+    for ligne, a, b, d in troncons_gpe(gares):
+        lignes_liens.setdefault(ligne, []).append((a, b, d))
+
+    lignes_c = []
+    for ligne, liens in lignes_liens.items():
+        v = GPE_VITESSE_KMH[ligne] / 3.6
+        for k, chemin in enumerate(parcours(liens)):
+            for sens, arrets in (("a", chemin), ("r", [(n, chemin[-1][1] - x) for n, x in reversed(chemin)])):
+                for h0 in range(DEBUT, max(ARRIVEES), GPE_INTERVALLE_S):
+                    trip = f"GPE:{ligne}:{k}{sens}:{h0}"
+                    temps = [h0 + round(x / v) for _, x in arrets]
+                    for (na, _), (nb, _), ta, tb in zip(arrets, arrets[1:], temps, temps[1:]):
+                        lignes_c.append((trip, f"GPE:{ligne}:{na}", ta, 0, f"GPE:{ligne}:{nb}", tb, 0))
+    c = pd.DataFrame(lignes_c, columns=["trip_id", "dep_stop", "dep", "montee", "arr_stop", "arr", "descente"])
+
+    quais_gpe = gares.assign(stop_id="GPE:" + gares["ligne"] + ":" + gares["nom"]).drop_duplicates("stop_id")
+    # Cheminements : gare GPE ↔ quais existants proches, et entre lignes du GPE d'une même gare.
+    chem = []
+    tous = gpd.sjoin(gpd.GeoDataFrame(quais_gpe[["stop_id"]], geometry=quais_gpe.buffer(GPE_CORRESPONDANCE_M), crs=gares.crs),
+                     quais_existants[["stop_id", "geometry"]].rename(columns={"stop_id": "q"}), predicate="contains")
+    for sid, q, idx_g in zip(tous["stop_id"], tous["q"], tous.index):
+        d = quais_gpe.geometry.loc[idx_g].distance(quais_existants.set_index("stop_id").geometry.loc[q])
+        duree = int(d * DETOUR / VITESSE_MARCHE_M_MIN * 60 + GPE_PROFONDEUR_S)
+        chem += [(sid, q, duree), (q, sid, duree)]
+    for _, g in quais_gpe.groupby("nom"):
+        for a in g["stop_id"]:
+            for b in g["stop_id"]:
+                if a != b:
+                    chem.append((a, b, GPE_CORRESPONDANCE_INTERNE_S))
+    chem = pd.DataFrame(chem, columns=["from", "to", "duree"])
+    print(f"GPE : {len(lignes_liens)} lignes, {quais_gpe['nom'].nunique()} gares, {c['trip_id'].nunique()} circulations "
+          f"fictives, {len(chem)} cheminements")
+    return c, quais_gpe, chem
+
+
+def calculer_matrice(c: pd.DataFrame, index: dict[str, int], tr: pd.DataFrame, quai_station: np.ndarray,
+                     quais_par_pole: pd.Series, n: int, n_poles: int, titre: str) -> np.ndarray:
+    c = c.sort_values(["dep", "arr"], ascending=False)
+    trips = {t: k for k, t in enumerate(pd.unique(c["trip_id"]))}
+    cols = dict(c_dep=c["dep"].tolist(), c_arr=c["arr"].tolist(), c_dep_q=c["dep_stop"].map(index).tolist(),
+                c_arr_q=c["arr_stop"].map(index).tolist(), c_trip=c["trip_id"].map(trips).tolist(),
+                c_montee=c["montee"].tolist(), c_descente=c["descente"].tolist())
+    entrants = entrants_par_quai(tr, len(index))
+    matrice = np.full((n, n_poles), INJOIGNABLE, dtype=np.uint8)
+    debut = time.time()
+    for k, (p_dest, quais_dest) in enumerate(quais_par_pole.items()):
+        somme = np.zeros(n)
+        ok = np.ones(n, dtype=bool)
+        for h in ARRIVEES:
+            dep = csa_rebours(**cols, n_quais=len(index), n_trips=len(trips), entrants=entrants,
+                              destinations=quais_dest, heure=h)
+            # Station de départ : le quai qui permet de partir le plus tard.
+            par_station = pd.Series(dep).groupby(quai_station).max().drop(-1, errors="ignore")
+            duree = (h - par_station.reindex(range(n))) / 60
+            ok &= (duree >= 0).to_numpy() & (duree < INJOIGNABLE).to_numpy()
+            somme += duree.fillna(0).to_numpy()
+        colonne = np.where(ok, np.round(somme / len(ARRIVEES)), INJOIGNABLE)
+        matrice[:, p_dest] = np.clip(colonne, 0, INJOIGNABLE).astype(np.uint8)
+    print(f"matrice {titre} : {n} stations × {n_poles} pôles ({time.time() - debut:.0f} s)")
+    return matrice
+
+
 def stations_des_iris(stations: gpd.GeoDataFrame) -> pd.DataFrame:
-    """Stations à distance de marche de chaque IRIS, avec le temps de marche estimé (minutes)."""
+    """Stations à distance de marche de chaque IRIS, avec le temps de marche estimé (minutes).
+    On garde les N_STATIONS_IRIS stations en service les plus proches et les N_GARES_GPE_IRIS gares du GPE."""
     iris = gpd.read_parquet(PROC / "indicateurs_iris.parquet")[["code_iris", "geometry"]]
     centre = iris.centroid
     ref = centre.where(centre.within(iris.geometry), iris.representative_point())
@@ -224,7 +346,10 @@ def stations_des_iris(stations: gpd.GeoDataFrame) -> pd.DataFrame:
     j["station"] = j["index_right"]
     j["marche_min"] = (pts.geometry.loc[j.index].distance(stations.geometry.loc[j["station"]], align=False).to_numpy()
                        * DETOUR / VITESSE_MARCHE_M_MIN).round(1)
-    j = j.sort_values(["code_iris", "marche_min"]).groupby("code_iris").head(N_STATIONS_IRIS)
+    j["gpe"] = stations["gpe"].loc[j["station"]].to_numpy()
+    j = j.sort_values(["code_iris", "marche_min"])
+    j = pd.concat([j[~j["gpe"]].groupby("code_iris").head(N_STATIONS_IRIS),
+                   j[j["gpe"]].groupby("code_iris").head(N_GARES_GPE_IRIS)]).sort_values(["code_iris", "marche_min"])
     res = j.groupby("code_iris").agg(stations=("station", list), marche_min=("marche_min", list)).reset_index()
     print(f"IRIS avec au moins une station à moins de {MARCHE_MAX_M} m : {len(res)} / {len(iris)}")
     return res
@@ -242,51 +367,55 @@ def main() -> None:
 
     stations, rattachement = rattacher_quais(con, quais)
     tr = correspondances(con, index)
-    entrants = entrants_par_quai(tr, len(quais))
 
-    cols = dict(c_dep=c["dep"].tolist(), c_arr=c["arr"].tolist(), c_dep_q=c["dep_stop"].map(index).tolist(),
-                c_arr_q=c["arr_stop"].map(index).tolist(), c_trip=c["trip_id"].map(trips).tolist(),
-                c_montee=c["montee"].tolist(), c_descente=c["descente"].tolist())
     quai_station = np.full(len(quais), -1)
     for q, s in rattachement.items():
         quai_station[index[q]] = s
     stations["pole"] = poles(stations, tr, quai_station)
+    stations["gpe"] = False
+    stations["desservie"] = stations.index.isin(pd.unique(quai_station[quai_station >= 0]))
     quai_pole = np.where(quai_station >= 0, stations["pole"].to_numpy()[quai_station], -1)
     quais_par_pole = pd.Series(np.arange(len(quais))).groupby(quai_pole).apply(list).drop(-1, errors="ignore")
+    n_poles = stations["pole"].nunique()
 
-    n, n_poles = len(stations), stations["pole"].nunique()
-    matrice = np.full((n, n_poles), INJOIGNABLE, dtype=np.uint8)
-    debut = time.time()
-    for k, (p_dest, quais_dest) in enumerate(quais_par_pole.items()):
-        somme = np.zeros(n)
-        ok = np.ones(n, dtype=bool)
-        for h in ARRIVEES:
-            dep = csa_rebours(**cols, n_quais=len(quais), n_trips=len(trips), entrants=entrants,
-                              destinations=quais_dest, heure=h)
-            # Station de départ : le quai qui permet de partir le plus tard.
-            par_station = pd.Series(dep).groupby(quai_station).max().drop(-1, errors="ignore")
-            duree = (h - par_station.reindex(range(n))) / 60
-            ok &= (duree >= 0).to_numpy() & (duree < INJOIGNABLE).to_numpy()
-            somme += duree.fillna(0).to_numpy()
-        colonne = np.where(ok, np.round(somme / len(ARRIVEES)), INJOIGNABLE)
-        matrice[:, p_dest] = np.clip(colonne, 0, INJOIGNABLE).astype(np.uint8)
-        if k % 100 == 0:
-            print(f"  destination {k + 1}/{len(quais_par_pole)} ({time.time() - debut:.0f} s)")
+    # Réseau GPE fictif : gares ajoutées en fin de liste des stations (lignes supplémentaires de la matrice).
+    arrets = con.sql(f"select stop_id, stop_lon, stop_lat from read_csv('{GTFS}/stops.txt', "
+                     f"types={{'stop_id':'VARCHAR'}})").df()
+    arrets = arrets[arrets["stop_id"].isin(index)]
+    quais_existants = gpd.GeoDataFrame(arrets[["stop_id"]], crs="EPSG:4326",
+                                       geometry=gpd.points_from_xy(arrets["stop_lon"], arrets["stop_lat"])).to_crs(stations.crs)
+    c_gpe, quais_gpe, chem_gpe = reseau_gpe(quais_existants)
+    gares_gpe = (quais_gpe.groupby("nom", as_index=False)
+                 .agg(lignes=("ligne", lambda x: ", ".join(sorted(set(x)))), geometry=("geometry", "first")))
+    gares_gpe = gpd.GeoDataFrame(gares_gpe, geometry="geometry", crs=stations.crs)
+    gares_gpe = gares_gpe.assign(id_ref_zdc="gpe:" + gares_gpe["nom"], pole=-1, gpe=True, desservie=True)
+    toutes = pd.concat([stations, gares_gpe], ignore_index=True)
+    toutes = gpd.GeoDataFrame(toutes, geometry="geometry", crs=stations.crs)
+    n = len(toutes)
 
-    stations["desservie"] = stations.index.isin(pd.unique(quai_station[quai_station >= 0]))
+    matrice = calculer_matrice(c, index, tr, quai_station, quais_par_pole, n, n_poles, "sans GPE")
+
+    index_gpe = {**index, **{q: len(index) + k for k, q in enumerate(quais_gpe["stop_id"])}}
+    station_de_gare = dict(zip(gares_gpe["nom"], range(len(stations), n)))
+    quai_station_gpe = np.concatenate([quai_station, quais_gpe["nom"].map(station_de_gare).to_numpy()])
+    tr_gpe = pd.concat([tr, pd.DataFrame({"a": chem_gpe["from"].map(index_gpe), "b": chem_gpe["to"].map(index_gpe),
+                                          "duree": chem_gpe["duree"]})], ignore_index=True)
+    matrice_gpe = calculer_matrice(pd.concat([c, c_gpe], ignore_index=True), index_gpe, tr_gpe, quai_station_gpe,
+                                   quais_par_pole, n, n_poles, "avec GPE")
+    stations = toutes
     # Pôle : nom = celui de sa station la plus connectée (le plus de lignes), position = centre des stations.
     stations["n_lignes"] = stations["lignes"].str.count(",") + 1
-    tete = stations.sort_values("n_lignes", ascending=False).drop_duplicates("pole").set_index("pole")
-    membres = stations.groupby("pole")["nom"].agg(lambda x: " / ".join(sorted(set(x))))
-    centre = stations.dissolve(by="pole").centroid
-    pole_df = gpd.GeoDataFrame({"nom": tete["nom"], "stations": membres, "desservi": stations.groupby("pole")["desservie"].any()},
+    tete = stations[~stations["gpe"]].sort_values("n_lignes", ascending=False).drop_duplicates("pole").set_index("pole")
+    membres = stations[~stations["gpe"]].groupby("pole")["nom"].agg(lambda x: " / ".join(sorted(set(x))))
+    centre = stations[~stations["gpe"]].dissolve(by="pole").centroid
+    pole_df = gpd.GeoDataFrame({"nom": tete["nom"], "stations": membres,
+                                "desservi": stations[~stations["gpe"]].groupby("pole")["desservie"].any()},
                                geometry=centre, crs=stations.crs).sort_index()
     stations.drop(columns="n_lignes").to_parquet(PROC / "stations_trajet.parquet")
     pole_df.to_parquet(PROC / "poles_trajet.parquet")
     np.save(PROC / "temps_trajet.npy", matrice)
+    np.save(PROC / "temps_trajet_gpe.npy", matrice_gpe)
     stations_des_iris(stations).to_parquet(PROC / "iris_stations_trajet.parquet")
-    print(f"matrice {n} stations × {n_poles} pôles écrite ({time.time() - debut:.0f} s) ; "
-          f"stations desservies : {stations['desservie'].sum()}")
 
 
 if __name__ == "__main__":
