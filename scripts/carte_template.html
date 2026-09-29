@@ -690,8 +690,10 @@ function afficherFinancement(profil) {
   const lignes = zonesPresentes.map((z) => `<tr><td>Zone ${NOM_ZONE[z]}</td><td>${fmt(res.ancien[z].prix)} €</td>` +
     `<td>${fmt(res.neuf[z].prix)} €</td><td>${res.neuf[z].ptz.montant ? fmt(res.neuf[z].ptz.montant) + " €" : "—"}</td></tr>`).join("");
   const ref = res.neuf.A, ptzA = ref.ptz, alA = ref.al;
+  const remboursement = (p) => p.differeMois ? `${p.differeMois / 12} ans sans rembourser puis ${(p.dureeMois - p.differeMois) / 12} ans`
+    : `remboursé sur ${p.dureeMois / 12} ans sans différé`;
   const etatPtz = ptzA.montant ? `éligible dans le neuf, tranche ${ptzA.tranche} (${Math.round(ptzA.quotite * 100)} % du prix, plafonné ; ` +
-      `${ptzA.differeMois / 12} ans sans rembourser puis ${(ptzA.dureeMois - ptzA.differeMois) / 12} ans)` : `non éligible (${ptzA.raison})`;
+      `${remboursement(ptzA)})` : `non éligible (${ptzA.raison})`;
   const etatAl = alA.montant ? `${fmt(alA.montant)} € à 1 % sur 25 ans` : `non (${alA.raison})`;
   document.getElementById("resultat-financement").innerHTML =
     `<table><tr><th>Prix maximal</th><th>Ancien</th><th>Neuf</th><th>dont PTZ</th></tr>${lignes}</table>
