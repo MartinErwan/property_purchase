@@ -248,7 +248,7 @@ carte.on("load", () => {
   const h = hachure();
   carte.addImage("hachure", h.getContext("2d").getImageData(0, 0, h.width, h.height), { pixelRatio: 2 });
 
-  carte.addSource("iris", { type: "geojson", data: DATA.iris });
+  carte.addSource("iris", { type: "geojson", data: DATA.iris, promoteId: "id" });
   carte.addSource("communes", { type: "geojson", data: DATA.communes });
   carte.addSource("lignes", { type: "geojson", data: DATA.lignes });
   carte.addSource("stations", { type: "geojson", data: DATA.stations });
@@ -271,9 +271,10 @@ carte.on("load", () => {
   carte.addLayer({ id: "communes", type: "line", source: "communes",
     layout: { "line-join": "round" }, paint: { "line-color": "#3d3c38", "line-width": epCommune(0),
       "line-opacity": ["interpolate", ["linear"], ["zoom"], 8, 0.35, 11, 1] } });
-  // Quartier survolé : contour souligné.
-  carte.addLayer({ id: "iris-survol", type: "line", source: "iris", filter: ["==", ["get", "id"], ""],
-    paint: { "line-color": "#2a78d6", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 15, 3] } });
+  // Quartier survolé : contour souligné, piloté par l'état « survol » (voir survoler()).
+  carte.addLayer({ id: "iris-survol", type: "line", source: "iris",
+    paint: { "line-color": "#2a78d6", "line-width": ["interpolate", ["linear"], ["zoom"], 10, 1.5, 15, 3],
+             "line-opacity": ["case", ["boolean", ["feature-state", "survol"], false], 1, 0] } });
   // Commune trouvée par la recherche : contour souligné.
   carte.addSource("commune-active", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
   carte.addLayer({ id: "commune-active-lisere", type: "line", source: "commune-active",
@@ -367,22 +368,38 @@ function contenu(f) {
       <tr><td>QPV</td><td>${pct(p.q)} de la surface · tampon ${pct(p.tq)}</td></tr>
     </table>`;
 }
-carte.on("mousemove", (e) => {
+// Quartier survolé : état « survol » posé sur l'objet (feature-state), sans refiltrer la couche.
+let quartierSurvole = null;
+function survoler(id) {
+  if (id === quartierSurvole) return;
+  if (quartierSurvole != null) carte.setFeatureState({ source: "iris", id: quartierSurvole }, { survol: false });
+  if (id != null) carte.setFeatureState({ source: "iris", id }, { survol: true });
+  quartierSurvole = id;
+}
+// Un seul traitement par image affichée, sur la dernière position de la souris.
+let dernierPoint = null, imageDemandee = false;
+function traiterSurvol() {
+  imageDemandee = false;
+  const point = dernierPoint;
   const ordre = ["futures", "stations", "lignes", "lignes-futures", "ventes", "qpv", "iris"].filter((l) => carte.getLayer(l));
-  const f = carte.queryRenderedFeatures(e.point, { layers: ordre })
-    .sort((a, b) => ordre.indexOf(a.layer.id) - ordre.indexOf(b.layer.id))[0];
+  const trouves = carte.queryRenderedFeatures(point, { layers: ordre });
+  const f = trouves.sort((a, b) => ordre.indexOf(a.layer.id) - ordre.indexOf(b.layer.id))[0];
   carte.getCanvas().style.cursor = f ? "pointer" : "";
   // Le quartier sous la souris est souligné, quel que soit l'objet survolé au-dessus.
-  const quartier = carte.queryRenderedFeatures(e.point, { layers: ["iris"] })[0];
-  carte.setFilter("iris-survol", ["==", ["get", "id"], quartier ? quartier.properties.id : ""]);
+  const quartier = trouves.find((t) => t.layer.id === "iris");
+  survoler(quartier ? quartier.properties.id : null);
   if (!f) { bulle.style.display = "none"; return; }
   bulle.innerHTML = contenu(f);
   bulle.style.display = "block";
-  const W = carte.getContainer().clientWidth, x = e.point.x + 14, y = e.point.y + 14;
+  const W = carte.getContainer().clientWidth, x = point.x + 14, y = point.y + 14;
   bulle.style.left = `${Math.min(x, W - bulle.offsetWidth - 8)}px`;
   bulle.style.top = `${y}px`;
+}
+carte.on("mousemove", (e) => {
+  dernierPoint = e.point;
+  if (!imageDemandee) { imageDemandee = true; requestAnimationFrame(traiterSurvol); }
 });
-carte.on("mouseout", () => { bulle.style.display = "none"; carte.setFilter("iris-survol", ["==", ["get", "id"], ""]); });
+carte.on("mouseout", () => { dernierPoint = null; bulle.style.display = "none"; survoler(null); });
 
 // ---------- Contrôles et légende ----------
 function brancherControles() {
