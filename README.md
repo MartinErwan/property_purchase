@@ -14,7 +14,7 @@ partir de ces données. Contexte, règles et jalons : voir `CLAUDE.md`.
 | `data/raw/`, `data/processed/` | Données brutes et intermédiaires (non versionnées) |
 | `data/exports/` | Sorties QGIS / Kepler / `carte.html` (non versionnées) |
 | `data/app/` | Fichiers de données lus par l'application (non versionnés, jalon 1) |
-| `app/` | Application web PWA — Vite + React + TypeScript + MapLibre (jalon 2) |
+| `app/` | Application web PWA — Vite + React + TypeScript + MapLibre (voir `app/README.md`) |
 | `supabase/` | Migrations SQL : comptes et synchronisation (jalon 7) |
 | `.github/workflows/` | Tests, pipeline planifié et déploiement (jalon 8) |
 
@@ -34,6 +34,8 @@ uv run python scripts/09_export_carte.py         # exports QGIS / Kepler
 uv run python scripts/10_carte_html.py           # carte HTML interactive
 uv run python scripts/11_export_app.py           # données de l'application web (data/app/)
 ```
+
+Puis l'application web : `cd app && npm install && npm run dev` (détails dans `app/README.md`).
 
 Les valeurs initiales des filtres se règlent en ligne de commande (script 09), par exemple :
 `uv run python scripts/09_export_carte.py --budget-ancien 230000 --surface 50 --dist-max 600 --revenu-min 20000`.
