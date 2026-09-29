@@ -10,6 +10,10 @@ Choix :
   disponibles (nd) laissées à NaN, statut conservé dans `revenu_statut`.
 - Communes non découpées en IRIS (TYP_IRIS = Z) : médiane communale Filosofi 2021, signalée
   par `source_revenu = "commune"`.
+- Zonage A/B/C (PTZ, Action Logement) : zone de la commune dans la liste ministérielle en vigueur
+  au 26 juin 2026. Paris y figure en une seule commune (75056) : appliquée aux 20 arrondissements.
+  Communes fusionnées depuis 2022 (absentes de la liste) : zone de la commune voisine la plus proche,
+  signalée par `source_zone = "voisine"`.
 - QPV : tampon de 300 m (TVA à 5,5 %). Le tampon de 500 m réservé aux QPV sous convention NPNRU
   n'est PAS appliqué : règle et liste NPNRU non vérifiées à la source. Colonne `npnru` vide.
 """
@@ -70,8 +74,28 @@ def construire_iris() -> gpd.GeoDataFrame:
     iris.loc[z, "source_revenu"] = "commune"
     iris = iris.drop(columns="revenu_median_commune")
 
+    iris = ajouter_zonage(iris)
     print(f"IRIS : {len(iris)} ; revenu renseigné : {iris['revenu_median'].notna().sum()} "
           f"(dont {z.sum()} via la commune) ; manquant : {iris['revenu_median'].isna().sum()}")
+    return iris
+
+
+def ajouter_zonage(iris: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    z = pd.read_csv(RAW / "zonage" / "liste-ensemble-des-communes-zonage-abc-en-vigueur-26-juin-2026.csv",
+                    sep=";", dtype=str)
+    zones = dict(zip(z.iloc[:, 0], z.iloc[:, 3].str.strip()))
+    code = iris["code_commune"].where(~iris["code_commune"].str.startswith("751"), "75056")
+    iris["zone_abc"] = code.map(zones)
+    iris["source_zone"] = pd.Series("liste", index=iris.index).where(iris["zone_abc"].notna(), "voisine")
+    manquantes = iris["zone_abc"].isna()
+    if manquantes.any():
+        communes = iris.dissolve(by="code_commune", aggfunc="first")
+        connues = communes[communes["zone_abc"].notna()]
+        for c in iris.loc[manquantes, "code_commune"].unique():
+            voisine = connues.geometry.distance(communes.geometry.loc[c]).idxmin()
+            iris.loc[iris["code_commune"] == c, "zone_abc"] = connues.loc[voisine, "zone_abc"]
+            print(f"zonage : {communes.loc[c, 'nom_commune']} absente de la liste → zone de "
+                  f"{connues.loc[voisine, 'nom_commune']} ({connues.loc[voisine, 'zone_abc']})")
     return iris
 
 

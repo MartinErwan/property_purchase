@@ -56,7 +56,21 @@ Colonnes principales de `iris_indicateurs` : `prix_m2_median_{ancien,vefa}_24m` 
   vitesse commerciale sur le tracé IDFM, 2 min de profondeur en correspondance.
 - **Revenus** : Filosofi 2021 (dernier millésime, 2022 non produit par l'INSEE). Valeurs
   secrétisées laissées à NaN ; 7 communes non irisées → médiane communale (`source_revenu`).
-- **Budget** : frais de notaire non inclus ; surface cible par défaut 45 m² (hypothèse).
+- **Budget** : curseurs (frais de notaire non inclus ; surface cible par défaut 45 m²) ou **profil de
+  financement** dans la carte, qui calcule un prix maximal par zone A bis / A / B1 / B2 :
+  - zonage A/B/C en vigueur au 26 juin 2026 (liste ministérielle, data.gouv.fr) ; communes fusionnées
+    depuis 2022 → zone de la commune voisine ;
+  - PTZ (jusqu'au 31/12/2027) : primo-accédant, revenu retenu = max(RFR N-2, prix / 9) divisé par le
+    coefficient familial → tranche 1 à 4 (plafonds A/A bis 25/31/37/49 k€, B1 21,5/26/30/34,5 k€,
+    B2 18/22,5/27/31,5 k€) ; neuf partout, quotité 50/40/40/20 % de min(prix, plafond d'opération :
+    150 k€ en A/A bis, 135 k€ en B1, 110 k€ en B2, × coefficient plafonné à 2,4) ; différé 10/8/2/0 ans,
+    durée 25/20/15/10 ans ; PTZ ancien (zone B2, ≥ 25 % de travaux) non compté dans le budget ;
+  - prêt Action Logement : 30 000 € à 1 % sur 25 ans, ≤ 40 % du prix, plafonds de ressources 2026 ;
+  - crédit bancaire : taux d'effort ≤ 35 % assurance comprise (règle HCSF), plan lissé (mensualité
+    constante sur la durée du plus long des prêts) ; frais de notaire 7,5 % ancien / 2,5 % neuf, payés
+    d'abord par l'apport ;
+  - ces barèmes viennent de sources secondaires (sites officiels inaccessibles depuis l'environnement de
+    développement) : à vérifier ; estimation indicative, seule une banque peut confirmer.
 - **QPV / TVA 5,5 %** : tampon de 300 m seulement. Le tampon de 500 m (QPV sous convention
   NPNRU) n'est pas appliqué : règle et liste non vérifiées à la source.
 - **QPV 2024** : archive ANCT `qpv-2024.zip` (jeu « quartiers-prioritaires-de-la-politique-de-la-ville-qpv »

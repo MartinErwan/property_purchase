@@ -6,6 +6,8 @@
   communes non découpées en IRIS. 2021 est le dernier millésime : l'INSEE a annoncé que 2022 ne
   sera pas produit.
 - Contours IRIS édition 2022-01-01 (IGN, Géoplateforme) : même géographie que Filosofi 2021.
+- Zonage A/B/C des communes en vigueur au 26 juin 2026 (ministère du Logement, data.gouv.fr, jeu
+  « liste-des-communes-selon-le-zonage-abc ») : plafonds du PTZ et du prêt Action Logement.
 - QPV génération 2024, archive complète des périmètres (GeoJSON, GPKG, SHP) (ANCT, data.gouv.fr,
   jeu « quartiers-prioritaires-de-la-politique-de-la-ville-qpv »). Si static.data.gouv.fr est
   injoignable, déposer `qpv-2024.zip` à la main dans data/raw/qpv/ : le script le dézippe.
@@ -29,6 +31,10 @@ SOURCES = {
     "iris": (
         "https://data.geopf.fr/telechargement/download/CONTOURS-IRIS/"
         "CONTOURS-IRIS_2-1__SHP__FRA_2022-01-01/CONTOURS-IRIS_2-1__SHP__FRA_2022-01-01.7z"
+    ),
+    "zonage": (
+        "https://static.data.gouv.fr/resources/liste-des-communes-selon-le-zonage-abc/20260703-091314/"
+        "liste-ensemble-des-communes-zonage-abc-en-vigueur-26-juin-2026.csv"
     ),
     "qpv": (
         "https://static.data.gouv.fr/resources/quartiers-prioritaires-de-la-politique-de-la-ville-qpv/"

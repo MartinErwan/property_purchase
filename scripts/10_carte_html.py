@@ -98,7 +98,7 @@ def preparer() -> dict:
         "dist_station_actuelle_m": "da", "station_actuelle_proche": "sa",
         "dist_station_future_m": "df", "station_future_proche": "sf",
         "part_surface_qpv": "q", "part_surface_tampon_qpv_300m": "tq",
-        "acces_stations": "ts", "acces_marche": "tm",
+        "acces_stations": "ts", "acces_marche": "tm", "zone_abc": "z",
     })
 
     # Stations : un point par station (toutes lignes regroupées). Stations actuelles regroupées par
