@@ -1,7 +1,22 @@
 # Carte de sélection de quartiers — Île-de-France
 
 Pipeline reproductible qui croise prix réels (DVF), transports (IDFM), revenus (Filosofi) et QPV
-par IRIS, et exporte une carte interactive HTML ainsi que des fichiers pour QGIS et Kepler.gl. Contexte et règles : voir `CLAUDE.md`.
+par IRIS, et exporte une carte interactive HTML ainsi que des fichiers pour QGIS et Kepler.gl.
+Une application web installable (PWA, ordinateur et téléphone) est en cours de construction à
+partir de ces données. Contexte, règles et jalons : voir `CLAUDE.md`.
+
+## Arborescence
+
+| Dossier | Contenu |
+|---|---|
+| `scripts/` | Pipeline de données Python (un script par étape) |
+| `notebooks/` | Exploration et contrôle de chaque étape |
+| `data/raw/`, `data/processed/` | Données brutes et intermédiaires (non versionnées) |
+| `data/exports/` | Sorties QGIS / Kepler / `carte.html` (non versionnées) |
+| `data/app/` | Fichiers de données lus par l'application (non versionnés, jalon 1) |
+| `app/` | Application web PWA — Vite + React + TypeScript + MapLibre (jalon 2) |
+| `supabase/` | Migrations SQL : comptes et synchronisation (jalon 7) |
+| `.github/workflows/` | Tests, pipeline planifié et déploiement (jalon 8) |
 
 ## Lancer le pipeline
 
