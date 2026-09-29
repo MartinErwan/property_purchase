@@ -687,8 +687,8 @@ function afficherFinancement(profil) {
   const res = { ancien: {}, neuf: {} };
   for (const z of ZONES_FIN) for (const t of ["ancien", "neuf"]) res[t][z] = budgetMax(profil, z, t);
   const zonesPresentes = ZONES_FIN.filter((z) => DATA.iris.features.some((f) => f.properties.z === z));
-  const lignes = zonesPresentes.map((z) => `<tr><td>Zone ${NOM_ZONE[z]}</td><td>${fmt(res.ancien[z].prix)} €</td>` +
-    `<td>${fmt(res.neuf[z].prix)} €</td><td>${res.neuf[z].ptz.montant ? fmt(res.neuf[z].ptz.montant) + " €" : "—"}</td></tr>`).join("");
+  const lignes = zonesPresentes.map((z) => `<tr><td>Zone ${NOM_ZONE[z]}</td><td>${fmt(res.ancien[z].prix)}</td>` +
+    `<td>${fmt(res.neuf[z].prix)}</td><td>${res.neuf[z].ptz.montant ? fmt(res.neuf[z].ptz.montant) : "—"}</td></tr>`).join("");
   const ref = res.neuf.A, ptzA = ref.ptz, alA = ref.al;
   const remboursement = (p) => p.differeMois ? `${p.differeMois / 12} ans sans rembourser puis ${(p.dureeMois - p.differeMois) / 12} ans`
     : `remboursé sur ${p.dureeMois / 12} ans sans différé`;
@@ -696,7 +696,7 @@ function afficherFinancement(profil) {
       `${remboursement(ptzA)})` : `non éligible (${ptzA.raison})`;
   const etatAl = alA.montant ? `${fmt(alA.montant)} € à 1 % sur 25 ans` : `non (${alA.raison})`;
   document.getElementById("resultat-financement").innerHTML =
-    `<table><tr><th>Prix maximal</th><th>Ancien</th><th>Neuf</th><th>dont PTZ</th></tr>${lignes}</table>
+    `<table><tr><th>Prix max (€)</th><th>Ancien</th><th>Neuf</th><th>dont PTZ</th></tr>${lignes}</table>
      <p class="etat"><b>PTZ</b> (en zone A) : ${etatPtz}.</p>
      <p class="etat"><b>Action Logement</b> : ${etatAl}.</p>
      <p class="etat"><b>Crédit bancaire</b> (neuf, zone A) : ${fmt(ref.banque)} € sur ${profil.duree} ans ; mensualité totale
