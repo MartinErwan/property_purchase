@@ -153,6 +153,24 @@ def preparer() -> dict:
     return donnees
 
 
+def horizons_gpe() -> list[dict]:
+    """Une entrée par horizon de mise en service du GPE : matrice encodée et libellé des lignes ouvertes."""
+    traces = gpd.read_parquet(PROC / "lignes.parquet")
+    traces = traces[~traces["existant"] & traces["ligne"].str.fullmatch(r"METRO 1[5-8]")].copy()
+    traces["annee"] = traces["mise_en_service"].str.extract(r"(20\d\d)", expand=False).astype(float)
+    res = []
+    for f in sorted(PROC.glob("temps_trajet_gpe_*.npy")):
+        an = int(f.stem.rsplit("_", 1)[1])
+        lignes = []
+        for ligne, t in traces.groupby("ligne"):
+            ouverts = (t["annee"] <= an).sum()
+            if ouverts:
+                lignes.append(ligne.split()[1] + ("" if ouverts == len(t) else " partielle"))
+        res.append({"annee": an, "lignes": ", ".join(lignes),
+                    "matrice": base64.b64encode(np.load(f).tobytes()).decode()})
+    return res
+
+
 def trajet(st_trajet: gpd.GeoDataFrame) -> dict:
     """Matrice des temps (stations × pôles) encodée en base64, pôles de destination et noms des stations."""
     matrice = np.load(PROC / "temps_trajet.npy")
@@ -160,7 +178,7 @@ def trajet(st_trajet: gpd.GeoDataFrame) -> dict:
     defaut = poles.index[poles["stations"].str.split(" / ").map(lambda x: DESTINATION_DEFAUT in x)][0]
     return {
         "matrice": base64.b64encode(matrice.tobytes()).decode(),
-        "matrice_gpe": base64.b64encode(np.load(PROC / "temps_trajet_gpe.npy").tobytes()).decode(),
+        "horizons": horizons_gpe(),
         "poles": [{"n": n, "s": s, "d": bool(d), "c": [round(g.x, DECIMALES), round(g.y, DECIMALES)]}
                   for n, s, d, g in zip(poles["nom"], poles["stations"], poles["desservi"], poles.geometry)],
         "stations": (st_trajet["nom"] + st_trajet["gpe"].map({True: " (GPE)", False: ""})).tolist(),
