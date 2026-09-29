@@ -3,7 +3,7 @@
 Entrées : data/processed/{indicateurs_iris, transports, dvf_appartements}.parquet, qpv*.parquet (optionnels)
 Sorties : data/exports/carte.gpkg              (QGIS, Lambert-93, une couche par thème)
           data/exports/kepler/*.geojson|csv    (WGS84, à glisser dans https://kepler.gl/demo)
-La carte HTML interactive est produite ensuite par scripts/09_carte_html.py.
+La carte HTML interactive est produite ensuite par scripts/10_carte_html.py.
 
 Filtres (paramètres ci-dessous ou en ligne de commande) :
 - budget : prix médian au m² de l'IRIS × surface cible <= budget (ancien et VEFA séparément,
@@ -15,7 +15,7 @@ Filtres (paramètres ci-dessous ou en ligne de commande) :
 
 La colonne `selection` combine les filtres budget (ancien OU VEFA) + distance + revenu.
 
-Usage : uv run python scripts/08_export_carte.py [--budget-ancien 210000] ...
+Usage : uv run python scripts/09_export_carte.py [--budget-ancien 210000] ...
 """
 
 import argparse

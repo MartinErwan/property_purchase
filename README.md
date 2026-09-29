@@ -14,12 +14,13 @@ uv run python scripts/04_build_transports.py     # couche transports typée par 
 uv run python scripts/05_download_socio.py       # Filosofi 2021, contours IRIS 2022, QPV 2024
 uv run python scripts/06_build_iris_qpv.py       # IRIS + revenu médian, QPV + tampon 300 m
 uv run python scripts/07_indicateurs_iris.py     # indicateurs par IRIS
-uv run python scripts/08_export_carte.py         # exports QGIS / Kepler
-uv run python scripts/09_carte_html.py           # carte HTML interactive
+uv run python scripts/08_temps_trajet.py         # temps de trajet (horaires GTFS IDFM)
+uv run python scripts/09_export_carte.py         # exports QGIS / Kepler
+uv run python scripts/10_carte_html.py           # carte HTML interactive
 ```
 
-Les valeurs initiales des filtres se règlent en ligne de commande (script 08), par exemple :
-`uv run python scripts/08_export_carte.py --budget-ancien 230000 --surface 50 --dist-max 600 --revenu-min 20000`.
+Les valeurs initiales des filtres se règlent en ligne de commande (script 09), par exemple :
+`uv run python scripts/09_export_carte.py --budget-ancien 230000 --surface 50 --dist-max 600 --revenu-min 20000`.
 Dans `carte.html`, tous les filtres restent modifiables à la souris.
 
 Les notebooks `notebooks/0X_*.ipynb` contrôlent chaque étape (exploration puis vérification).

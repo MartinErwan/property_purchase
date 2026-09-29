@@ -2,16 +2,19 @@
 des lignes à leur couleur officielle avec un point par station, QPV hachurés, filtres budget /
 distance / revenu / QPV réglables dans la page.
 
-Entrée  : data/exports/carte.gpkg (scripts/08_export_carte.py)
+Entrées : data/exports/carte.gpkg (scripts/09_export_carte.py)
+          data/processed/{stations_trajet,poles_trajet,iris_stations_trajet}.parquet, temps_trajet.npy
+          (scripts/08_temps_trajet.py)
 Sortie  : data/exports/carte.html (un seul fichier ; seul le fond de plan est chargé depuis internet :
           Plan IGN v2 de la Géoplateforme, sans clé d'API)
 
 La bibliothèque MapLibre GL JS (licence BSD-3) est téléchargée une fois depuis le registre npm
 dans data/raw/vendor/ puis intégrée dans la page.
 
-Usage : uv run python scripts/09_carte_html.py
+Usage : uv run python scripts/10_carte_html.py
 """
 
+import base64
 import io
 import json
 import re
@@ -19,6 +22,7 @@ import tarfile
 from pathlib import Path
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import requests
 
@@ -26,11 +30,14 @@ from zone import DEPARTEMENTS
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPORT = ROOT / "data" / "exports"
+PROC = ROOT / "data" / "processed"
 VENDOR = ROOT / "data" / "raw" / "vendor" / "maplibre-gl-4.7.1"
 MAPLIBRE_TGZ = "https://registry.npmjs.org/maplibre-gl/-/maplibre-gl-4.7.1.tgz"
 
 SIMPLIFICATION_M = 4  # simplification des contours pour l'affichage uniquement
 DECIMALES = 5  # ~1 m en latitude
+DESTINATION_DEFAUT = "Châtelet-Les Halles"   # pôle de destination initial du temps de trajet
+TRAJET_MAX_DEFAUT = 60                        # minutes (120 = pas de filtre)
 
 
 def maplibre() -> tuple[str, str]:
@@ -72,6 +79,11 @@ def preparer() -> dict:
     communes = geojson(communes, {"nom_commune": "n", "code_commune": "c"})
 
     i["geometry"] = i.geometry.simplify(SIMPLIFICATION_M)
+    # Stations accessibles à pied de chaque IRIS (indices de lignes de la matrice) et temps de marche.
+    acces = pd.read_parquet(PROC / "iris_stations_trajet.parquet")
+    i = i.merge(acces.rename(columns={"stations": "acces_stations", "marche_min": "acces_marche"}), on="code_iris", how="left")
+    i["acces_stations"] = i["acces_stations"].map(lambda v: [int(x) for x in v] if isinstance(v, (list, np.ndarray)) else [])
+    i["acces_marche"] = i["acces_marche"].map(lambda v: [float(x) for x in v] if isinstance(v, (list, np.ndarray)) else [])
     for c in ("prix_m2_median_ancien_24m", "prix_m2_median_vefa_24m", "prix_m2_median_ancien_commune_24m",
               "revenu_median", "dist_station_actuelle_m", "dist_station_future_m"):
         i[c] = arrondir(i[c])
@@ -86,6 +98,7 @@ def preparer() -> dict:
         "dist_station_actuelle_m": "da", "station_actuelle_proche": "sa",
         "dist_station_future_m": "df", "station_future_proche": "sf",
         "part_surface_qpv": "q", "part_surface_tampon_qpv_300m": "tq",
+        "acces_stations": "ts", "acces_marche": "tm",
     })
 
     # Stations : un point par station (toutes lignes regroupées). Stations actuelles regroupées par
@@ -99,22 +112,26 @@ def preparer() -> dict:
                mise_en_service=("mise_en_service", "first"), existant=("existant", "first"),
                geometry=("geometry", "first")))
     s["correspondance"] = s["n_lignes"] > 1
+    # Ligne de la station dans la matrice des temps de trajet (stations en service uniquement).
+    st_trajet = gpd.read_parquet(PROC / "stations_trajet.parquet")
+    s["k"] = s["cle"].map(dict(zip(st_trajet["id_ref_zdc"].astype(str), st_trajet.index))).astype("Int64")
     s = gpd.GeoDataFrame(s, geometry="geometry", crs="EPSG:2154")
     stations = geojson(s, {"nom": "n", "lignes": "l", "couleur": "c", "statut": "st", "existant": "e",
-                           "correspondance": "x", "mise_en_service": "ms"})
+                           "correspondance": "x", "mise_en_service": "ms", "k": "k"})
 
     lg = gpd.read_file(gpkg, layer="lignes")
     lg["geometry"] = lg.geometry.simplify(SIMPLIFICATION_M)
     lignes = geojson(lg, {"ligne": "l", "mode": "m", "couleur": "c", "existant": "e", "statut": "st",
                           "projet": "p", "mise_en_service": "ms"})
 
-    # Valeurs initiales des filtres = paramètres utilisés par le script 08 (texte de la colonne `parametres`).
+    # Valeurs initiales des filtres = paramètres utilisés par le script 09 (texte de la colonne `parametres`).
     budget_ancien, budget_vefa, surface, dist_max, revenu_min = map(
         float, re.findall(r"\d+(?:\.\d+)?", i["parametres"].iloc[0]))
     donnees = {"iris": iris, "communes": communes, "stations": stations, "lignes": lignes, "departements": DEPARTEMENTS,
                "periode": i["periode_24m"].iloc[0],
                "defauts": {"budget_ancien": budget_ancien, "budget_vefa": budget_vefa, "surface": surface,
-                           "dist_max": dist_max, "revenu_min": revenu_min}}
+                           "dist_max": dist_max, "revenu_min": revenu_min, "trajet_max": TRAJET_MAX_DEFAUT},
+               "trajet": trajet(st_trajet)}
 
     if {"qpv", "qpv_tampon_300m"} <= couches:
         q = gpd.read_file(gpkg, layer="qpv")
@@ -132,6 +149,20 @@ def preparer() -> dict:
         v["valeur_fonciere"].round().astype(int),
     ))
     return donnees
+
+
+def trajet(st_trajet: gpd.GeoDataFrame) -> dict:
+    """Matrice des temps (stations × pôles) encodée en base64, pôles de destination et noms des stations."""
+    matrice = np.load(PROC / "temps_trajet.npy")
+    poles = gpd.read_parquet(PROC / "poles_trajet.parquet").to_crs("EPSG:4326")
+    defaut = poles.index[poles["stations"].str.split(" / ").map(lambda x: DESTINATION_DEFAUT in x)][0]
+    return {
+        "matrice": base64.b64encode(matrice.tobytes()).decode(),
+        "poles": [{"n": n, "s": s, "d": bool(d), "c": [round(g.x, DECIMALES), round(g.y, DECIMALES)]}
+                  for n, s, d, g in zip(poles["nom"], poles["stations"], poles["desservi"], poles.geometry)],
+        "stations": st_trajet["nom"].tolist(),
+        "pole_defaut": int(defaut),
+    }
 
 
 def main() -> None:
