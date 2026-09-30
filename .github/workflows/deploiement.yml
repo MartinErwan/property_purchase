@@ -1,0 +1,141 @@
+# Données + déploiement de l'application sur Cloudflare Pages.
+#
+# - Données : le pipeline (scripts 01 à 09, puis 11) tourne au plus une fois par mois et par version des
+#   scripts ; son résultat (data/app/) est gardé dans le cache GitHub Actions. Contrôles qualité bloquants
+#   (scripts/12_controle_app.py) avant toute publication.
+# - Ventes individuelles (fichiers « privés ») : envoyées dans le stockage Supabase privé, jamais sur le site.
+# - Site : préversion pour chaque PR (https://<branche>.<projet>.pages.dev), production sur la branche par
+#   défaut, rafraîchissement mensuel des données (le 3 à 4 h UTC) ou à la demande.
+#
+# Secrets : CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID ; SUPABASE_SERVICE_ROLE_KEY (optionnel : sans lui,
+# les ventes ne sont pas publiées).
+name: Données et déploiement
+
+on:
+  pull_request:
+  push:
+    branches: ["**"]
+  schedule:
+    - cron: "0 4 3 * *"
+  workflow_dispatch:
+    inputs:
+      forcer_pipeline:
+        description: "Relancer le pipeline même si les données du mois sont en cache"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploiement-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  PROJET_PAGES: ou-acheter
+  SUPABASE_URL: https://derqhgkevjibgkxnyypx.supabase.co
+
+jobs:
+  deployer:
+    # Push : seulement la branche par défaut (les autres branches passent par leur PR). Pas de secrets
+    # pour les PR venant d'un fork : on ne les déploie pas.
+    if: >-
+      (github.event_name != 'push' || github.ref_name == github.event.repository.default_branch) &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clé des données (mois + version des scripts)
+        id: cle
+        run: echo "mois=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+
+      - name: Données en cache
+        id: cache
+        if: ${{ !inputs.forcer_pipeline }}
+        uses: actions/cache@v4
+        with:
+          path: data/app
+          key: donnees-app-${{ steps.cle.outputs.mois }}-${{ hashFiles('scripts/**', 'pyproject.toml', 'uv.lock') }}
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Pipeline de données
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          uv sync --frozen
+          for s in 01_download_dvf 02_clean_dvf 03_download_transports 04_build_transports; do
+            echo "::group::$s"; uv run python scripts/$s.py; echo "::endgroup::"
+          done
+          # static.data.gouv.fr coupe parfois la connexion (QPV) : jusqu'à 3 essais.
+          for essai in 1 2 3; do
+            echo "::group::05_download_socio (essai $essai)"; uv run python scripts/05_download_socio.py; echo "::endgroup::"
+            ls data/raw/qpv/*.zip >/dev/null 2>&1 && break
+            sleep 60
+          done
+          for s in 06_build_iris_qpv 07_indicateurs_iris 08_temps_trajet 09_export_carte 11_export_app; do
+            echo "::group::$s"; uv run python scripts/$s.py; echo "::endgroup::"
+          done
+
+      - name: Contrôles qualité (bloquants)
+        run: uv run --no-project --with numpy python scripts/12_controle_app.py
+
+      - name: Ventes individuelles → stockage Supabase privé
+        # Non bloquant : sans le bucket « prive » (migration Supabase pas encore appliquée), le site reste déployé.
+        continue-on-error: true
+        env:
+          CLE: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "$CLE" ]; then echo "::warning::SUPABASE_SERVICE_ROLE_KEY absent : ventes non publiées"; exit 0; fi
+          python3 - <<'EOF'
+          import json, os, urllib.request
+          m = json.load(open("data/app/manifest.json"))
+          for f in (x for x in m["fichiers"].values() if x.get("prive")):
+              with open(f"data/app/{f['fichier']}", "rb") as fh:
+                  req = urllib.request.Request(
+                      f"{os.environ['SUPABASE_URL']}/storage/v1/object/prive/{f['fichier']}", data=fh.read(), method="POST",
+                      headers={"Authorization": f"Bearer {os.environ['CLE']}", "apikey": os.environ["CLE"],
+                               "Content-Type": "application/json", "x-upsert": "true", "cache-control": "3600"})
+              urllib.request.urlopen(req, timeout=120)
+              print(f"envoyé : {f['fichier']} ({f['octets'] / 1e6:.1f} Mo)")
+          EOF
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Construction de l'application
+        working-directory: app
+        run: |
+          npm ci
+          npm run build
+          # Garde-fou : aucun fichier privé ne doit partir avec le site.
+          python3 -c "
+          import json, os, sys
+          m = json.load(open('../data/app/manifest.json'))
+          fuite = [f['fichier'] for f in m['fichiers'].values() if f.get('prive') and os.path.exists('dist/donnees/' + f['fichier'])]
+          sys.exit(f'fichiers privés dans dist : {fuite}') if fuite else print('aucun fichier privé dans dist')"
+
+      - name: Déploiement Cloudflare Pages
+        id: pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BRANCHE: ${{ github.head_ref || github.ref_name }}
+          PRODUCTION: ${{ github.event.repository.default_branch }}
+        working-directory: app
+        run: |
+          set -euo pipefail
+          # Création du projet au premier déploiement (erreur ignorée s'il existe déjà).
+          npx --yes wrangler@4 pages project create "$PROJET_PAGES" --production-branch="$PRODUCTION" || true
+          npx --yes wrangler@4 pages deploy dist --project-name="$PROJET_PAGES" --branch="$BRANCHE" \
+            --commit-dirty=true | tee deploiement.log
+          url=$(grep -oE 'https://[a-zA-Z0-9.-]+\.pages\.dev' deploiement.log | tail -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          { echo "### Déployé"; echo; echo "- Branche : \`$BRANCHE\`"; echo "- Adresse : $url"; } >> "$GITHUB_STEP_SUMMARY"
