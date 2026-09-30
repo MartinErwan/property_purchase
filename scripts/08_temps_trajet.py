@@ -37,8 +37,10 @@ Méthode (Connection Scan Algorithm à rebours) :
   Les gares du GPE deviennent aussi des stations de départ pour les IRIS voisins.
 """
 
+import os
 import re
 import time
+from datetime import date, datetime, timedelta
 import zipfile
 from pathlib import Path
 
@@ -60,6 +62,10 @@ PROC = ROOT / "data" / "processed"
 # si le fichier est remplacé par une version plus récente).
 JOUR = "20261006"
 JOUR_SEMAINE = "tuesday"
+# Garde-fous pour le pipeline automatique : un mardi ordinaire compte ~6 000 circulations ferrées (GTFS de
+# septembre 2026) ; bien moins signale un jour mal choisi (hors fichier, férié, grève).
+MIN_CIRCULATIONS = 2000
+ECART_DEBUT_JOURS = 7  # choix automatique : au moins une semaine après le début du fichier
 DEBUT = 5 * 3600 + 30 * 60             # 05:30 (les trajets longs de grande couronne partent tôt)
 ARRIVEES = [h * 3600 + m * 60 for h, m in ((8, 30), (8, 45), (9, 0), (9, 15))]
 CHANGEMENT_QUAI_S = 60
@@ -98,8 +104,28 @@ def extraire_gtfs() -> None:
             z.extractall(GTFS, members=manquants)
 
 
-def connexions(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
-    """Une ligne par tronçon (arrêt → arrêt suivant) d'une circulation ferrée du JOUR."""
+def choisir_jour(con: duckdb.DuckDBPyConnection) -> str:
+    """Jour de référence : JOUR_GTFS (variable d'environnement, AAAAMMJJ) s'il est défini, sinon JOUR s'il est
+    couvert par le GTFS téléchargé, sinon le premier mardi couvert, au moins ECART_DEBUT_JOURS après le début
+    du fichier (30 jours glissants). Ce choix automatique ne vérifie PAS les vacances scolaires ni les fériés."""
+    if os.environ.get("JOUR_GTFS"):
+        return os.environ["JOUR_GTFS"]
+    debut, fin = con.sql(f"select min(start_date), max(end_date) from read_csv('{GTFS}/calendar.txt', "
+                         f"types={{'start_date':'VARCHAR','end_date':'VARCHAR'}})").fetchone()
+    if debut <= JOUR <= fin:
+        return JOUR
+    d = datetime.strptime(debut, "%Y%m%d").date() + timedelta(days=ECART_DEBUT_JOURS)
+    d += timedelta(days=(1 - d.weekday()) % 7)  # mardi suivant (lundi = 0)
+    if d > datetime.strptime(fin, "%Y%m%d").date():
+        raise SystemExit(f"GTFS du {debut} au {fin} : aucun mardi utilisable ; fixer JOUR_GTFS")
+    jour = d.strftime("%Y%m%d")
+    print(f"ATTENTION : {JOUR} hors du GTFS ({debut} → {fin}) ; jour retenu automatiquement : {jour} "
+          f"(vacances scolaires et fériés non vérifiés)")
+    return jour
+
+
+def connexions(con: duckdb.DuckDBPyConnection, jour: str) -> pd.DataFrame:
+    """Une ligne par tronçon (arrêt → arrêt suivant) d'une circulation ferrée du jour de référence."""
     g = str(GTFS)
     hms = lambda c: (f"(split_part({c},':',1)::int*3600 + split_part({c},':',2)::int*60"  # noqa: E731
                      f" + split_part({c},':',3)::int)")
@@ -107,9 +133,9 @@ def connexions(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
     create or replace table services as
     with base as (
         select service_id from read_csv('{g}/calendar.txt', types={{'start_date':'VARCHAR','end_date':'VARCHAR'}})
-        where {JOUR_SEMAINE} = 1 and start_date <= '{JOUR}' and end_date >= '{JOUR}'),
+        where {JOUR_SEMAINE} = 1 and start_date <= '{jour}' and end_date >= '{jour}'),
     ex as (select service_id, exception_type
-           from read_csv('{g}/calendar_dates.txt', types={{'date':'VARCHAR'}}) where date = '{JOUR}')
+           from read_csv('{g}/calendar_dates.txt', types={{'date':'VARCHAR'}}) where date = '{jour}')
     select service_id from base where service_id not in (select service_id from ex where exception_type = 2)
     union select service_id from ex where exception_type = 1;
 
@@ -389,11 +415,16 @@ def main() -> None:
     extraire_gtfs()
     con = duckdb.connect()
     debut = time.time()
-    c = connexions(con)
+    jour = choisir_jour(con)
+    assert date.fromisoformat(f"{jour[:4]}-{jour[4:6]}-{jour[6:]}").weekday() == 1, f"{jour} n'est pas un mardi"
+    c = connexions(con, jour)
     quais = pd.unique(pd.concat([c["dep_stop"], c["arr_stop"]]))
     index = {q: k for k, q in enumerate(quais)}
     trips = {t: k for k, t in enumerate(pd.unique(c["trip_id"]))}
-    print(f"{len(c):,} tronçons, {len(quais)} quais, {len(trips):,} circulations ({time.time() - debut:.0f} s)")
+    print(f"{jour} : {len(c):,} tronçons, {len(quais)} quais, {len(trips):,} circulations ({time.time() - debut:.0f} s)")
+    if len(trips) < MIN_CIRCULATIONS:
+        raise SystemExit(f"Seulement {len(trips)} circulations le {jour} (< {MIN_CIRCULATIONS}) : jour anormal, "
+                         "fixer JOUR_GTFS sur un mardi ordinaire couvert par le GTFS")
 
     stations, rattachement = rattacher_quais(con, quais)
     tr = correspondances(con, index)

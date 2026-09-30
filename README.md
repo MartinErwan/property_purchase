@@ -15,8 +15,8 @@ partir de ces données. Contexte, règles et jalons : voir `CLAUDE.md`.
 | `data/exports/` | Sorties QGIS / Kepler / `carte.html` (non versionnées) |
 | `data/app/` | Fichiers de données lus par l'application (non versionnés, jalon 1) |
 | `app/` | Application web PWA — Vite + React + TypeScript + MapLibre (voir `app/README.md`) |
-| `supabase/` | Migrations SQL : comptes et synchronisation (jalon 7) |
-| `.github/workflows/` | Tests, pipeline planifié et déploiement (jalon 8) |
+| `supabase/` | Migrations SQL et mise en place des comptes (voir `supabase/README.md`) |
+| `.github/workflows/` | `app.yml` : vérifications du front ; `deploiement.yml` : pipeline mensuel, contrôles, déploiement Cloudflare Pages |
 
 ## Lancer le pipeline
 
@@ -33,7 +33,12 @@ uv run python scripts/08_temps_trajet.py         # temps de trajet (horaires GTF
 uv run python scripts/09_export_carte.py         # exports QGIS / Kepler
 uv run python scripts/10_carte_html.py           # carte HTML interactive
 uv run python scripts/11_export_app.py           # données de l'application web (data/app/)
+uv run python scripts/12_controle_app.py         # contrôles qualité avant publication (bloquants)
 ```
+
+Le jour de référence des horaires (script 08) est le mardi `JOUR` s'il est couvert par le GTFS téléchargé ;
+sinon le premier mardi couvert, une semaine après le début du fichier (vacances et fériés non vérifiés). Pour
+imposer un jour : `JOUR_GTFS=20261013 uv run python scripts/08_temps_trajet.py`.
 
 Puis l'application web : `cd app && npm install && npm run dev` (détails dans `app/README.md`).
 
