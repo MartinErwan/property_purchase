@@ -43,3 +43,15 @@ Il faut d'abord avoir lancé le pipeline jusqu'au script 11 (voir le README à l
 - **Hors ligne** : non. Le service worker ne met en cache que l'application ; les données passent par le cache
   HTTP (noms par empreinte, `public/_headers`).
 - **Indexation** : `robots.txt`, `<meta name="robots">` et en-tête `X-Robots-Tag` (Cloudflare Pages).
+
+## Comptes (Supabase)
+
+`src/compte/` : client Supabase, session, synchronisation du profil et de la dernière vue
+(`useSynchroCompte`), ventes individuelles téléchargées depuis le stockage privé (`useVentes`). Mise en place
+côté Supabase : `supabase/README.md`.
+
+## Déploiement
+
+`.github/workflows/deploiement.yml` : préversion Cloudflare Pages pour chaque PR, production sur la branche par
+défaut, données rafraîchies chaque mois (pipeline en cache, contrôles qualité bloquants, garde-fou contre la
+publication d'un fichier privé).

@@ -1,5 +1,6 @@
 import { useEtat, type Couches } from '../etat'
 import { useRessources } from '../donnees/store'
+import { useConnecte } from '../compte/session'
 import { ECHELLES, ENCRE, SANS_DONNEE, fmt, type Indicateur } from '../logique/echelles'
 
 function LegendeCouleurs({ ind }: { ind: Indicateur }) {
@@ -59,6 +60,7 @@ export function PanneauCarte() {
   const { ind, couches, set, majCouches } = useEtat()
   const donnees = useRessources((r) => r.donnees)
   const sansQpv = !donnees?.qpv
+  const connecte = useConnecte()
 
   return (
     <>
@@ -70,13 +72,13 @@ export function PanneauCarte() {
 
       <h3>Couches</h3>
       {CASES.map(([cle, libelle]) => {
-        const indisponible = (cle === 'qpv' && sansQpv) || cle === 'ventes'
+        const indisponible = (cle === 'qpv' && sansQpv) || (cle === 'ventes' && !connecte)
         return (
           <label key={cle} className="case">
             <input type="checkbox" checked={couches[cle] && !indisponible} disabled={indisponible}
               onChange={(e) => majCouches({ [cle]: e.target.checked })} />
             <span>{libelle}
-              {cle === 'ventes' && <small className="discret"> — réservé aux utilisateurs connectés (bientôt)</small>}
+              {cle === 'ventes' && !connecte && <small className="discret"> — réservé aux utilisateurs connectés (onglet Compte)</small>}
               {cle === 'qpv' && sansQpv && <small className="discret"> — non disponible dans ces données</small>}
             </span>
           </label>

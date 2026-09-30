@@ -6,7 +6,11 @@ import { useSynchroCarte } from './carte/useSynchroCarte'
 import { chargerDonnees, chargerMatrice, chargerMetaTrajet } from './donnees/chargement'
 import { useRessources } from './donnees/store'
 import { useEtat } from './etat'
-import { decoder, encoder } from './logique/url'
+import { decoder } from './logique/url'
+import { RECHERCHE_INITIALE } from './compte/retourConnexion'
+import { useSynchroCompte } from './compte/useSynchroCompte'
+import { useVentes } from './compte/useVentes'
+import { useVueEncodee } from './vue'
 import { FicheQuartier } from './panneaux/FicheQuartier'
 import { PanneauCarte } from './panneaux/PanneauCarte'
 import { PanneauCompte } from './panneaux/PanneauCompte'
@@ -35,7 +39,7 @@ function useChargement(): void {
         const d = await chargerDonnees()
         if (annule) return
         // Valeurs par défaut du manifeste, puis état de l'URL par-dessus.
-        const url = decoder(window.location.search)
+        const url = decoder(RECHERCHE_INITIALE)
         const etat = useEtat.getState()
         etat.initialiser(d.manifeste)
         if (url.filtres) etat.majFiltres(url.filtres)
@@ -69,20 +73,12 @@ function useChargement(): void {
 
 /** L'adresse de la page reflète l'état (lien partageable), sans créer d'entrée d'historique. */
 function useSynchroUrl(): void {
-  const donnees = useRessources((r) => r.donnees)
-  const meta = useRessources((r) => r.meta)
-  const { ind, filtres, destination, horizon, irisChoisi } = useEtat()
+  const q = useVueEncodee()
   useEffect(() => {
-    if (!donnees || !meta) return
-    const d = donnees.manifeste.defauts
-    const q = encoder({ ind, filtres, destination, horizon, irisChoisi }, {
-      filtres: { ba: d.budget_ancien, bv: d.budget_vefa, su: d.surface, di: d.dist_max, rv: d.revenu_min,
-                 horsqpv: false, tt: d.trajet_max },
-      destinationDefaut: meta.pole_defaut,
-    })
+    if (q == null) return
     const minuteur = setTimeout(() => window.history.replaceState(null, '', q ? `?${q}` : window.location.pathname), 300)
     return () => clearTimeout(minuteur)
-  }, [donnees, meta, ind, filtres, destination, horizon, irisChoisi])
+  }, [q])
 }
 
 export default function App() {
@@ -98,6 +94,8 @@ export default function App() {
   useChargement()
   useSynchroCarte()
   useSynchroUrl()
+  useSynchroCompte()
+  useVentes()
 
   const surPrete = useCallback((c: CarteMapLibre) => useRessources.setState({ carte: c }), [])
 

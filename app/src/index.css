@@ -136,3 +136,19 @@ table.resultat th:first-child, table.resultat td:first-child { text-align: left;
 
 /* Contrôles MapLibre : laisser la place au tiroir et à la recherche sur mobile. */
 .app-mobile .maplibregl-ctrl-top-right { top: 56px; }
+
+/* ---------- Compte ---------- */
+.bouton { display: inline-flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 10px 14px;
+  border: 1px solid var(--rule); border-radius: 8px; background: #fff; cursor: pointer; font-weight: 600; margin: 6px 0; }
+.bouton:hover { background: var(--page); }
+.bouton:disabled { opacity: .6; cursor: default; }
+.bouton svg { width: 18px; height: 18px; }
+.bouton-principal { background: var(--accent); border-color: var(--accent); color: #fff; }
+.bouton-principal:hover { background: #1f65b8; }
+.separateur { display: flex; align-items: center; gap: 10px; color: var(--ink-2); font-size: 12px; margin: 10px 0; }
+.separateur::before, .separateur::after { content: ""; flex: 1; border-top: 1px solid var(--rule); }
+.formulaire-compte { display: grid; gap: 8px; }
+.formulaire-compte label { display: grid; gap: 4px; font-size: 13px; }
+.formulaire-compte input { padding: 9px 10px; border: 1px solid var(--rule); border-radius: 8px; background: #fff; font-size: 16px; }
+.lien { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; font: inherit; }
+.lien-danger { color: var(--erreur); display: inline-block; margin-top: 10px; }
