@@ -123,8 +123,10 @@ Utilisateur : moi d'abord ; ouverture éventuelle à d'autres plus tard si l'out
 ## Évolutions de l'application (après les jalons)
 - Fait : pages (Carte, Mes quartiers, Financement, Compte) avec adresses propres ; quartiers enregistrés
   depuis la fiche, triables, soulignés sur la carte, synchronisés avec le compte.
-- Prochaine étape envisagée : depuis « Mes quartiers », accès aux annonces en cours du quartier — par des
-  liens de recherche préremplis (commune, budget, surface) vers les sites d'annonces, PAS par scraping.
+- Fait : depuis « Mes quartiers », liens de recherche préremplis vers les sites d'annonces (Leboncoin :
+  rayon de 1,5 km autour du quartier ; Bien'ici : commune), avec budget et surface des réglages — PAS de
+  scraping. Formats d'URL relevés sur des sources secondaires ; filtres Bien'ici `prix-max`/`surface-min`
+  non vérifiés (`app/src/logique/annonces.ts`).
 
 ## Hors périmètre pour l'instant
 Scraping d'annonces (conditions d'utilisation des sites), prévision des taux, application native (stores),

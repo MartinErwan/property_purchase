@@ -29,3 +29,19 @@ export async function chercherAdresses(texte: string, signal?: AbortSignal): Pro
       lng: f.geometry.coordinates[0], lat: f.geometry.coordinates[1],
     }))
 }
+
+const codesPostaux = new Map<string, Promise<string | null>>()
+
+/** Code postal principal d'une commune (code INSEE), via le même service de géocodage ; mis en cache. */
+export function codePostal(codeInsee: string, nom: string): Promise<string | null> {
+  let r = codesPostaux.get(codeInsee)
+  if (!r) {
+    const params = new URLSearchParams({ q: nom, index: 'address', type: 'municipality', citycode: codeInsee, limit: '1' })
+    r = fetch(`${URL_GEOCODAGE}?${params}`)
+      .then((rep) => (rep.ok ? rep.json() : null))
+      .then((j: { features?: { properties: { postcode?: string } }[] } | null) => j?.features?.[0]?.properties.postcode ?? null)
+      .catch(() => null)
+    codesPostaux.set(codeInsee, r)
+  }
+  return r
+}

@@ -10,6 +10,10 @@ import { estSelectionne, type IrisCalcule } from '../logique/selection'
 import { libelleDestination } from '../logique/trajet'
 import { TRIS, trier, type Tri } from '../logique/tri'
 import { useEcranLarge } from '../ui/useEcranLarge'
+import { centreGeometrie } from '../logique/annonces'
+import type { Budgets } from '../logique/financement'
+import type { Filtres } from '../logique/selection'
+import { LiensAnnonces } from './LiensAnnonces'
 
 /** Page « Mes quartiers » : les quartiers enregistrés depuis leur fiche, triables, avec accès à la carte. */
 export function PageQuartiers() {
@@ -80,6 +84,7 @@ export function PageQuartiers() {
               <Mesure titre="Revenu médian" valeur={p.rv} unite="€" ind="rv" />
             </dl>
             <p className="discret petit">Station : {p.sa ?? '—'} à {fmt(p.da)} m · enregistré le {new Date(ajoute).toLocaleDateString('fr-FR')}</p>
+            <LiensQuartier p={p} centre={centreGeometrie(f.geometry)} filtres={filtres} budgets={budgets} />
             <div className="actions">
               <button type="button" className="bouton bouton-petit" onClick={() => voir(f)}>Voir sur la carte</button>
               <button type="button" className="lien lien-danger" onClick={() => retirer(id)}>Retirer</button>
@@ -102,4 +107,14 @@ function Mesure({ titre, valeur, unite, ind }: { titre: string; valeur: number |
       <dd><span className="puce" style={{ background: couleurDe(ind, valeur) }} />{valeur == null ? '—' : `${fmt(valeur)} ${unite}`}</dd>
     </div>
   )
+}
+
+/** Budget du quartier (le plus haut entre ancien et neuf : profil de financement selon la zone, sinon curseurs). */
+function LiensQuartier({ p, centre, filtres, budgets }: { p: IrisCalcule; centre: [number, number] | null
+                                                          filtres: Filtres; budgets: Budgets | null }) {
+  if (!centre) return null
+  const z = p.z && p.z !== 'C' ? p.z : null
+  const prixMax = budgets ? (z ? Math.max(budgets.ancien[z].prix, budgets.neuf[z].prix) : 0) : Math.max(filtres.ba, filtres.bv)
+  if (prixMax <= 0) return null
+  return <LiensAnnonces codeInsee={p.id.slice(0, 5)} critere={{ commune: p.nc, centre, prixMax, surfaceMin: filtres.su }} />
 }

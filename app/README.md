@@ -28,6 +28,7 @@ Il faut d'abord avoir lancé le pipeline jusqu'au script 11 (voir le README à l
 | `src/ui/` | Mise en page : onglets, tiroir mobile, champ de recherche avec suggestions |
 | `src/etat.ts` | État de l'interface (zustand) ; seul le profil de financement est mémorisé sur l'appareil |
 | `src/quartiers.ts` | Quartiers enregistrés (mémorisés sur l'appareil, synchronisés avec le compte) |
+| `src/logique/annonces.ts` | Liens de recherche préremplis vers Leboncoin / Bien'ici (pas de scraping) |
 | `src/navigation.ts` | Pages et sous-onglets de la carte |
 
 ## Pages
@@ -35,7 +36,7 @@ Il faut d'abord avoir lancé le pipeline jusqu'au script 11 (voir le README à l
 | Adresse | Page | Ordinateur | Mobile |
 |---|---|---|---|
 | `/` | Carte (+ réglages : Filtres · Trajet · Affichage) | panneau latéral | carte plein écran, pastilles des filtres, tiroir |
-| `/quartiers` | Mes quartiers (enregistrés depuis la fiche, triables) | panneau latéral, carte visible | plein écran |
+| `/quartiers` | Mes quartiers (enregistrés depuis la fiche, triables, liens vers les annonces) | panneau latéral, carte visible | plein écran |
 | `/financement` | Profil de financement | panneau latéral | plein écran |
 | `/compte` | Connexion, synchronisation, sources | panneau latéral | plein écran |
 
