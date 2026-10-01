@@ -1,7 +1,22 @@
 # Carte de sélection de quartiers — Île-de-France
 
 Pipeline reproductible qui croise prix réels (DVF), transports (IDFM), revenus (Filosofi) et QPV
-par IRIS, et exporte une carte interactive HTML ainsi que des fichiers pour QGIS et Kepler.gl. Contexte et règles : voir `CLAUDE.md`.
+par IRIS, et exporte une carte interactive HTML ainsi que des fichiers pour QGIS et Kepler.gl.
+Une application web installable (PWA, ordinateur et téléphone) est en cours de construction à
+partir de ces données. Contexte, règles et jalons : voir `CLAUDE.md`.
+
+## Arborescence
+
+| Dossier | Contenu |
+|---|---|
+| `scripts/` | Pipeline de données Python (un script par étape) |
+| `notebooks/` | Exploration et contrôle de chaque étape |
+| `data/raw/`, `data/processed/` | Données brutes et intermédiaires (non versionnées) |
+| `data/exports/` | Sorties QGIS / Kepler / `carte.html` (non versionnées) |
+| `data/app/` | Fichiers de données lus par l'application (non versionnés, jalon 1) |
+| `app/` | Application web PWA — Vite + React + TypeScript + MapLibre (voir `app/README.md`) |
+| `supabase/` | Migrations SQL et mise en place des comptes (voir `supabase/README.md`) |
+| `.github/workflows/` | `app.yml` : vérifications du front ; `deploiement.yml` : pipeline mensuel, contrôles, déploiement Cloudflare Pages |
 
 ## Lancer le pipeline
 
@@ -17,7 +32,15 @@ uv run python scripts/07_indicateurs_iris.py     # indicateurs par IRIS
 uv run python scripts/08_temps_trajet.py         # temps de trajet (horaires GTFS IDFM)
 uv run python scripts/09_export_carte.py         # exports QGIS / Kepler
 uv run python scripts/10_carte_html.py           # carte HTML interactive
+uv run python scripts/11_export_app.py           # données de l'application web (data/app/)
+uv run python scripts/12_controle_app.py         # contrôles qualité avant publication (bloquants)
 ```
+
+Le jour de référence des horaires (script 08) est le mardi `JOUR` s'il est couvert par le GTFS téléchargé ;
+sinon le premier mardi couvert, une semaine après le début du fichier (vacances et fériés non vérifiés). Pour
+imposer un jour : `JOUR_GTFS=20261013 uv run python scripts/08_temps_trajet.py`.
+
+Puis l'application web : `cd app && npm install && npm run dev` (détails dans `app/README.md`).
 
 Les valeurs initiales des filtres se règlent en ligne de commande (script 09), par exemple :
 `uv run python scripts/09_export_carte.py --budget-ancien 230000 --surface 50 --dist-max 600 --revenu-min 20000`.
@@ -32,6 +55,17 @@ Les notebooks `notebooks/0X_*.ipynb` contrôlent chaque étape (exploration puis
 | `carte.gpkg` | QGIS : couches `iris_indicateurs`, `stations`, `ventes_24m` (+ `qpv`, `qpv_tampon_300m` si disponibles), Lambert-93 |
 | `carte.html` | Carte interactive autonome (MapLibre GL intégré) : seuls les IRIS dans les filtres sont colorés (vert = bon marché → rouge = cher), tracés des lignes à leur couleur officielle IDFM avec un point par station, gares futures en points sombres, QPV hachurés, tampon de 300 m en tirets, filtres, infobulles et recherche de ville (hors ligne, zoom sur la commune). Seul le fond de plan (Plan IGN v2, sans clé d'API) vient d'internet |
 | `kepler/*.geojson`, `kepler/*.csv` | À glisser dans https://kepler.gl/demo |
+
+`data/app/` (non versionné) contient les fichiers lus par l'application web : `manifest.json` (version du
+schéma, date, période, valeurs par défaut des filtres, et pour chaque fichier son nom, sa taille et son
+SHA-256), puis des fichiers **nommés par empreinte** (`iris.<8 car.>.geojson`…) qui peuvent rester en cache
+indéfiniment : un contenu modifié change de nom. Les matrices de temps de trajet sont en binaire brut
+(`uint8`, stations × pôles, ligne par ligne, 255 = injoignable), une par horizon. Les ventes individuelles
+(`ventes_24m.*.json`) sont marquées `prive` dans le manifeste : elles ne sont pas publiées avec le site.
+
+Volumes mesurés (septembre 2026) : couches affichées au démarrage 2,2 Mo compressés (IRIS 1,4 Mo), matrice
+de trajet 0,7 Mo compressée par horizon, ventes 2,4 Mo compressées. Pas besoin de tuiles vectorielles
+(PMTiles) à ce stade.
 
 Colonnes principales de `iris_indicateurs` : `prix_m2_median_{ancien,vefa}_24m` et `n_ventes_*`,
 `evol_prix_m2_*` (24 derniers mois vs 24 précédents), `dist_{metro,rer,transilien,tram,cable,metro_futur,tram_futur,rer_futur}_m`,
