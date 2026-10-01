@@ -19,10 +19,10 @@ protègent les données. La clé `service_role` ne va **que** dans les secrets G
    - *Google* : activé, avec l'ID client et le secret du client OAuth « Application Web » (Google Cloud Console,
      URI de redirection autorisée : `https://derqhgkevjibgkxnyypx.supabase.co/auth/v1/callback`).
 3. **Authentication → URL Configuration** :
-   - *Site URL* : l'adresse de production (`https://ou-acheter.pages.dev`, ou celle affichée par le premier
-     déploiement) ;
-   - *Redirect URLs* : `http://localhost:5173/**`, `http://localhost:4173/**`, `https://*.ou-acheter.pages.dev/**`
-     et l'adresse de production suivie de `/**`.
+   - *Site URL* : `https://ou-acheter-2qp.pages.dev` (adresse de production attribuée par Cloudflare, le nom
+     `ou-acheter` étant déjà pris) ;
+   - *Redirect URLs* : `https://ou-acheter-2qp.pages.dev/**`, `https://*.ou-acheter-2qp.pages.dev/**`
+     (préversions), `http://localhost:5173/**`, `http://localhost:4173/**`.
 4. Une fois ton compte créé, si l'outil reste personnel : **Authentication → Sign In / Providers** → désactiver
    *Allow new users to sign up* (plus aucune inscription possible).
 5. **GitHub → Settings → Secrets and variables → Actions** : `SUPABASE_SERVICE_ROLE_KEY` = la clé `service_role`

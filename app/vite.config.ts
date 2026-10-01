@@ -82,8 +82,8 @@ export default defineConfig({
   ],
   worker: { format: 'es' },
   build: {
-    // MapLibre pèse ~800 Ko à lui seul : le découper ne réduirait pas ce que charge la carte au démarrage.
-    chunkSizeWarningLimit: 1500,
+    // MapLibre (~800 Ko) et Supabase (~200 Ko) : les découper ne réduirait pas ce que charge la carte au démarrage.
+    chunkSizeWarningLimit: 2000,
   },
   test: {
     environment: 'node',
