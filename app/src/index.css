@@ -153,3 +153,47 @@ table.resultat th:first-child, table.resultat td:first-child { text-align: left;
 .lien { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; font: inherit; }
 .lien-danger { color: var(--erreur); display: inline-block; margin-top: 10px; }
 .bouton-google-officiel { display: flex; justify-content: center; min-height: 44px; margin: 6px 0; }
+
+/* ---------- Pages ---------- */
+.titre-page { font-size: 20px; margin: 12px 0 10px; }
+.page-mobile { position: absolute; inset: 0; z-index: 12; background: var(--surface); overflow-y: auto;
+  padding: 8px 16px calc(24px + var(--bas)); overscroll-behavior: contain; }
+.onglet-icone { position: relative; display: inline-flex; }
+.pastille-nb { position: absolute; top: -4px; right: -10px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px;
+  background: #f59f00; color: #fff; font-size: 10.5px; font-weight: 700; line-height: 17px; text-align: center; }
+
+/* Sous-onglets du panneau de la carte */
+.segments { display: flex; gap: 4px; background: var(--page); padding: 4px; border-radius: 10px; margin: 10px 0 6px; }
+.segments button { flex: 1; border: 0; background: none; padding: 7px 4px; border-radius: 7px; cursor: pointer; font-weight: 600;
+  color: var(--ink-2); }
+.segments button[aria-selected="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+
+/* Résumé des filtres sur la carte (mobile) */
+.resume-filtres { position: absolute; top: 60px; left: 10px; right: 52px; z-index: 6; display: flex; gap: 6px;
+  overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
+.resume-filtres::-webkit-scrollbar { display: none; }
+.pastille-filtre { flex: none; border: 1px solid var(--rule); background: #fff; border-radius: 16px; padding: 6px 11px;
+  font-size: 13px; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); cursor: pointer; white-space: nowrap; }
+.pastille-reglages { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 600; }
+.pastille-compte { background: var(--accent-fond); color: var(--accent-encre); border-color: transparent; font-weight: 600; cursor: default; }
+.app-mobile .maplibregl-ctrl-top-right { top: 100px; }
+
+/* Bouton Enregistrer de la fiche */
+.bouton-enregistrer { margin: 0 0 10px; }
+.bouton-enregistrer.actif { background: #fff4e0; border-color: #f59f00; color: #8a5300; }
+
+/* Page « Mes quartiers » */
+.vide { text-align: center; padding: 30px 10px; color: var(--ink-2); }
+.vide .bouton { width: auto; margin-top: 10px; }
+.tri { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; margin: 4px 0 12px; font-size: 13px; }
+.liste-quartiers { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.carte-quartier { border: 1px solid var(--rule); border-radius: 12px; padding: 12px; background: #fff; }
+.carte-quartier-entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.carte-quartier-entete b { font-size: 15px; }
+.mesures { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin: 10px 0 6px; }
+.mesures dt { font-size: 11.5px; color: var(--ink-2); }
+.mesures dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; }
+.petit { font-size: 12px; margin: 4px 0; }
+.actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; }
+.actions .lien-danger { margin: 0; }
+.bouton-petit { width: auto; padding: 7px 12px; margin: 0; }
