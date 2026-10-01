@@ -5,6 +5,9 @@ par IRIS, et exporte une carte interactive HTML ainsi que des fichiers pour QGIS
 Une application web installable (PWA, ordinateur et téléphone) est en cours de construction à
 partir de ces données. Contexte, règles et jalons : voir `CLAUDE.md`.
 
+Vue d'ensemble : [`docs/architecture.png`](docs/architecture.png) (source modifiable
+[`docs/architecture.excalidraw`](docs/architecture.excalidraw), à ouvrir sur https://excalidraw.com).
+
 ## Arborescence
 
 | Dossier | Contenu |
@@ -16,6 +19,7 @@ partir de ces données. Contexte, règles et jalons : voir `CLAUDE.md`.
 | `data/app/` | Fichiers de données lus par l'application (non versionnés, jalon 1) |
 | `app/` | Application web PWA — Vite + React + TypeScript + MapLibre (voir `app/README.md`) |
 | `supabase/` | Migrations SQL et mise en place des comptes (voir `supabase/README.md`) |
+| `docs/` | Schéma d'ensemble de l'application (Excalidraw + aperçu PNG) |
 | `.github/workflows/` | `app.yml` : vérifications du front ; `deploiement.yml` : pipeline mensuel, contrôles, déploiement Cloudflare Pages |
 
 ## Lancer le pipeline
