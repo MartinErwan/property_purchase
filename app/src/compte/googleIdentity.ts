@@ -5,7 +5,8 @@
 // préversions *.pages.dev gardent la redirection classique.
 
 /** ID client OAuth « Application Web » (public par nature). Surchargeable au build. */
-export const ID_CLIENT_GOOGLE: string = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? ''
+export const ID_CLIENT_GOOGLE: string = import.meta.env.VITE_GOOGLE_CLIENT_ID
+  ?? '885075968921-ib3kd65u9fk4349560oql1e9p9g88f78.apps.googleusercontent.com'
 
 /** Origines déclarées dans « Origines JavaScript autorisées » du client Google. */
 const ORIGINES_AUTORISEES = ['https://ou-acheter-2qp.pages.dev', 'http://localhost:5173', 'http://localhost:4173']
