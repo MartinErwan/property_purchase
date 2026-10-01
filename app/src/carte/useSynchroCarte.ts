@@ -5,7 +5,9 @@ import { useRessources } from '../donnees/store'
 import { budgetsParZone, normaliserProfil, type Budgets } from '../logique/financement'
 import { exprCouleur, exprSelection, type IrisCalcule } from '../logique/selection'
 import { polesArrivee, tempsIris } from '../logique/trajet'
-import { ajouterCouches, majIris, majSource, majVisibilite } from './couches'
+import { ajouterCouches, majEnregistres, majIris, majSource, majVisibilite } from './couches'
+import { centrerSurIris } from './centrer'
+import { useQuartiers } from '../quartiers'
 
 /** Budgets par zone quand le profil de financement pilote le filtre de budget, sinon null. */
 export function useBudgets(): Budgets | null {
@@ -58,12 +60,14 @@ export function useSynchroCarte(): void {
     if (!prete || centre.current) return
     centre.current = true
     const f = irisChoisi ? donnees!.iris.features.find((x) => x.properties.id === irisChoisi) : null
-    if (!f) return
-    const pts = (f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates : [])
-      .flat(2) as [number, number][]
-    const lng = pts.map((q) => q[0]), lat = pts.map((q) => q[1])
-    carte!.fitBounds([Math.min(...lng), Math.min(...lat), Math.max(...lng), Math.max(...lat)], { padding: 80, maxZoom: 14, duration: 0 })
+    if (f) centrerSurIris(carte!, f, false)
   }, [prete, carte, donnees, irisChoisi])
+
+  // Quartiers enregistrés : contour doré.
+  const enregistres = useQuartiers((q) => q.enregistres)
+  useEffect(() => {
+    if (prete) majEnregistres(carte!, enregistres.map((q) => q.id))
+  }, [prete, carte, enregistres])
 
   // Quartier dont la fiche est ouverte : contour souligné.
   const precedent = useRef<string | null>(null)

@@ -72,6 +72,9 @@ export function ajouterCouches(carte: CarteMapLibre, d: Donnees): void {
   carte.addLayer({ id: 'iris-survol', type: 'line', source: 'iris',
     paint: { 'line-color': '#2a78d6', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.5, 15, 3],
              'line-opacity': ['case', etatActif, 1, 0] } })
+  // Quartiers enregistrés (« Mes quartiers ») : contour doré, filtré par majEnregistres().
+  carte.addLayer({ id: 'iris-enregistre', type: 'line', source: 'iris', filter: ['boolean', false],
+    paint: { 'line-color': '#f59f00', 'line-width': ['interpolate', ['linear'], ['zoom'], 9, 1.5, 14, 3.5] } })
   // Commune trouvée par la recherche : contour souligné.
   carte.addSource('commune-active', { type: 'geojson', data: VIDE })
   carte.addLayer({ id: 'commune-active-lisere', type: 'line', source: 'commune-active',
@@ -144,4 +147,8 @@ export function majVisibilite(carte: CarteMapLibre, c: Couches): void {
 
 export function majSource(carte: CarteMapLibre, source: string, data: FeatureCollection | Feature | null): void {
   (carte.getSource(source) as GeoJSONSource | undefined)?.setData(data ?? VIDE)
+}
+
+export function majEnregistres(carte: CarteMapLibre, ids: string[]): void {
+  carte.setFilter('iris-enregistre', ['in', ['get', 'id'], ['literal', ids]])
 }

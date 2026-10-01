@@ -8,12 +8,14 @@ protègent les données. La clé `service_role` ne va **que** dans les secrets G
 
 | Objet | Rôle | Accès |
 |---|---|---|
-| table `preferences` | profil de financement (`profil`, jsonb) et dernière vue de la carte (`vue`, paramètres d'URL) | chaque utilisateur connecté lit / écrit / supprime **sa** ligne ; supprimée avec le compte |
+| table `preferences` | profil de financement (`profil`, jsonb), dernière vue de la carte (`vue`, paramètres d'URL) et quartiers enregistrés (`quartiers`, jsonb) | chaque utilisateur connecté lit / écrit / supprime **sa** ligne ; supprimée avec le compte |
 | bucket `prive` | ventes DVF individuelles (`ventes_24m.<empreinte>.json`) | lecture : utilisateurs connectés ; écriture : pipeline (clé `service_role`) |
 
 ## Mise en place (une fois)
 
-1. **SQL Editor** → coller `migrations/20260930000000_preferences_et_donnees_privees.sql` → Run.
+1. **SQL Editor** → exécuter, dans l'ordre, chaque fichier de `migrations/` (coller → Run) :
+   `20260930000000_preferences_et_donnees_privees.sql` puis `20261002000000_quartiers_enregistres.sql`.
+   Les scripts sont idempotents : les relancer ne casse rien.
 2. **Authentication → Providers** :
    - *Email* : activé (confirmation de l'adresse conseillée) ;
    - *Google* : activé, avec l'ID client et le secret du client OAuth « Application Web » (Google Cloud Console,
@@ -30,6 +32,8 @@ protègent les données. La clé `service_role` ne va **que** dans les secrets G
 
 ## Choix
 
+- Quartiers enregistrés : à la connexion, union de la liste de l'appareil et de celle du compte (date d'ajout la
+  plus ancienne conservée), puis renvoi de la liste fusionnée.
 - Synchronisation : à la connexion, le profil du compte remplace celui de l'appareil (sinon celui de l'appareil
   est envoyé) ; ensuite chaque modification est enregistrée après 1,5 s. La dernière vue n'est restaurée que si la
   page a été ouverte sans paramètres (un lien partagé garde la priorité).

@@ -120,6 +120,12 @@ Utilisateur : moi d'abord ; ouverture éventuelle à d'autres plus tard si l'out
 7. Supabase : connexion, sauvegarde du profil et des filtres, ventes DVF réservées aux connectés.
 8. GitHub Actions : pipeline planifié, contrôles qualité, déploiement ; tests du front sur PR.
 
+## Évolutions de l'application (après les jalons)
+- Fait : pages (Carte, Mes quartiers, Financement, Compte) avec adresses propres ; quartiers enregistrés
+  depuis la fiche, triables, soulignés sur la carte, synchronisés avec le compte.
+- Prochaine étape envisagée : depuis « Mes quartiers », accès aux annonces en cours du quartier — par des
+  liens de recherche préremplis (commune, budget, surface) vers les sites d'annonces, PAS par scraping.
+
 ## Hors périmètre pour l'instant
-Scraping d'annonces, prévision des taux, application native (stores), mode hors ligne, itinéraires
-en temps réel via API (Navitia/PRIM), favoris / comparateur / notes de visite (v2 possible).
+Scraping d'annonces (conditions d'utilisation des sites), prévision des taux, application native (stores),
+mode hors ligne, itinéraires en temps réel via API (Navitia/PRIM), comparateur / notes de visite (v2 possible).
