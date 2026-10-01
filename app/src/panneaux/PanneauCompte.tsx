@@ -1,6 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { supabase } from '../compte/client'
 import { memoriserVueAvantConnexion } from '../compte/retourConnexion'
+import { boutonGoogleDisponible, chargerGoogle, ID_CLIENT_GOOGLE, nouveauNonce } from '../compte/googleIdentity'
 import { useSession } from '../compte/session'
 import { Sources } from './PanneauCarte'
 
@@ -15,12 +16,42 @@ const ERREURS: [RegExp, string][] = [
 ]
 const traduire = (m: string) => ERREURS.find(([re]) => re.test(m))?.[1] ?? m
 
+/** Bouton officiel Google (le jeton revient à la page, puis à Supabase) ; null si indisponible. */
+function BoutonGoogleOfficiel({ surErreur, surEchecChargement }: { surErreur: (m: string) => void; surEchecChargement: () => void }) {
+  const conteneur = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    let annule = false
+    ;(async () => {
+      try {
+        const [gid, nonce] = await Promise.all([chargerGoogle(), nouveauNonce()])
+        if (annule || !conteneur.current) return
+        gid.initialize({
+          client_id: ID_CLIENT_GOOGLE, nonce: nonce.empreinte, itp_support: true, use_fedcm_for_button: true,
+          callback: async ({ credential }) => {
+            const { error } = await supabase!.auth.signInWithIdToken({ provider: 'google', token: credential, nonce: nonce.brut })
+            if (error) surErreur(traduire(error.message))
+          },
+        })
+        gid.renderButton(conteneur.current, { type: 'standard', theme: 'outline', size: 'large', text: 'continue_with',
+          shape: 'rectangular', locale: 'fr', width: Math.min(conteneur.current.clientWidth || 320, 400) })
+      } catch {
+        if (!annule) surEchecChargement()
+      }
+    })()
+    return () => { annule = true }
+  }, [surErreur, surEchecChargement])
+  return <div ref={conteneur} className="bouton-google-officiel" />
+}
+
 function Connexion() {
   const [mode, setMode] = useState<'connexion' | 'inscription'>('connexion')
   const [email, setEmail] = useState('')
   const [motDePasse, setMotDePasse] = useState('')
   const [message, setMessage] = useState<{ type: 'erreur' | 'info'; texte: string } | null>(null)
   const [envoi, setEnvoi] = useState(false)
+  const [officiel, setOfficiel] = useState(boutonGoogleDisponible)
+  const erreurGoogle = useCallback((m: string) => setMessage({ type: 'erreur', texte: m }), [])
+  const secoursGoogle = useCallback(() => setOfficiel(false), [])
 
   const google = async () => {
     memoriserVueAvantConnexion()
@@ -53,13 +84,14 @@ function Connexion() {
     <>
       <p>Connecte-toi pour retrouver ton profil de financement et ta dernière vue sur tous tes appareils, et pour
         afficher les ventes individuelles des 24 derniers mois.</p>
+      {officiel ? <BoutonGoogleOfficiel surErreur={erreurGoogle} surEchecChargement={secoursGoogle} /> : (
       <button type="button" className="bouton bouton-google" onClick={google}>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M22.5 12.2c0-.8-.1-1.5-.2-2.2H12v4.2h5.9a5 5 0 0 1-2.2 3.3v2.7h3.6c2-1.9 3.2-4.7 3.2-8z" />
           <path fill="#34A853" d="M12 23c3 0 5.5-1 7.3-2.7l-3.6-2.8c-1 .7-2.2 1.1-3.7 1.1-2.9 0-5.3-1.9-6.2-4.5H2.1v2.8A11 11 0 0 0 12 23z" />
           <path fill="#FBBC05" d="M5.8 14.1a6.6 6.6 0 0 1 0-4.2V7.1H2.1a11 11 0 0 0 0 9.8l3.7-2.8z" />
           <path fill="#EA4335" d="M12 5.4c1.6 0 3.1.6 4.2 1.7l3.2-3.2A11 11 0 0 0 2.1 7.1l3.7 2.8C6.7 7.3 9.1 5.4 12 5.4z" /></svg>
         Continuer avec Google
-      </button>
+      </button>)}
 
       <div className="separateur"><span>ou</span></div>
 
