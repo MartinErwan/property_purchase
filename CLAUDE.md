@@ -124,9 +124,10 @@ Utilisateur : moi d'abord ; ouverture éventuelle à d'autres plus tard si l'out
 - Fait : pages (Carte, Mes quartiers, Financement, Compte) avec adresses propres ; quartiers enregistrés
   depuis la fiche, triables, soulignés sur la carte, synchronisés avec le compte.
 - Fait : depuis « Mes quartiers », liens de recherche préremplis vers les sites d'annonces (Leboncoin :
-  rayon de 1,5 km autour du quartier ; Bien'ici : commune), avec budget et surface des réglages — PAS de
-  scraping. Formats d'URL relevés sur des sources secondaires ; filtres Bien'ici `prix-max`/`surface-min`
-  non vérifiés (`app/src/logique/annonces.ts`).
+  rayon de 1,5 km autour du quartier ; Bien'ici : commune ; SeLoger : commune, Paris et petite couronne
+  seulement, identifiants internes déduits d'une règle vérifiée sur 11 relevés), avec budget et surface des
+  réglages — PAS de scraping. Formats d'URL relevés sur des sources secondaires ; filtres Bien'ici `prix-max`/`surface-min` et
+  SeLoger `spaceMin` non vérifiés (`app/src/logique/annonces.ts`).
 
 ## Hors périmètre pour l'instant
 Scraping d'annonces (conditions d'utilisation des sites), prévision des taux, application native (stores),
