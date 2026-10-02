@@ -6,16 +6,22 @@ import { appliquerVue, useVueEncodee } from '../vue'
 import { supabase } from './client'
 import { profilValide } from './profil'
 import { listeValide, useQuartiers } from '../quartiers'
+import { useAnnonces } from '../annonces'
+import { annoncesValides } from '../logique/annonce'
 import { VUE_INITIALE_VIDE } from './retourConnexion'
 import { useSession } from './session'
 
 const DELAI_ENREGISTREMENT_MS = 1500
+const SANS_COLONNE_ANNONCES = 'Annonces non synchronisées : exécuter la migration 20261003000000_annonces.sql dans Supabase.'
 
-/** Synchronise le profil de financement, la dernière vue et les quartiers enregistrés avec le compte
+/** La colonne « annonces » manque tant que sa migration n'a pas été exécutée : on synchronise le reste. */
+const colonneAnnoncesAbsente = (message: string) => /annonces/i.test(message)
+
+/** Synchronise le profil de financement, la dernière vue, les quartiers et les annonces enregistrés avec le compte
  * (table preferences).
  * À la connexion : le profil du compte remplace celui de l'appareil (sinon celui de l'appareil est envoyé) ;
  * la dernière vue du compte est restaurée si la page a été ouverte sans vue imposée par l'URL ; les quartiers
- * enregistrés sont fusionnés (union des deux listes), puis la liste fusionnée est renvoyée au compte.
+ * et annonces enregistrés sont fusionnés (union des deux listes), puis les listes fusionnées sont renvoyées au compte.
  * Ensuite : chaque modification est enregistrée après une courte pause. */
 export function useSynchroCompte(): void {
   const utilisateur = useSession((s) => s.session?.user.id ?? null)
@@ -23,6 +29,8 @@ export function useSynchroCompte(): void {
   const profil = useEtat((e) => e.profil)
   const vue = useVueEncodee()
   const quartiers = useQuartiers((q) => q.enregistres)
+  const annonces = useAnnonces((a) => a.annonces)
+  const avecAnnonces = useRef(true)
   const charge = useRef<string | null>(null) // utilisateur dont les préférences ont été relues
   const [relu, setRelu] = useState(0) // incrémenté après lecture : force un premier enregistrement fusionné
 
@@ -30,19 +38,26 @@ export function useSynchroCompte(): void {
   useEffect(() => {
     if (!supabase || !utilisateur || !donneesPretes || charge.current === utilisateur) return
     let annule = false
-    useSession.setState({ synchro: 'en cours', erreurSynchro: null })
-    supabase.from('preferences').select('profil, vue, quartiers').eq('user_id', utilisateur).maybeSingle()
-      .then(({ data, error }) => {
-        if (annule) return
-        if (error) { useSession.setState({ synchro: 'erreur', erreurSynchro: error.message }); return }
-        if (data?.profil) useEtat.getState().majProfil(profilValide(data.profil))
-        if (data?.vue && VUE_INITIALE_VIDE) appliquerVue(decoder(data.vue))
-        if (data?.quartiers) useQuartiers.getState().fusionner(listeValide(data.quartiers))
-        charge.current = utilisateur
-        useSession.setState({ synchro: 'à jour' })
-        // Renvoie au compte ce que l'appareil apporte (profil d'un premier passage, quartiers fusionnés).
-        setRelu((n) => n + 1)
-      })
+    const client = supabase
+    useSession.setState({ synchro: 'en cours', erreurSynchro: null, avertissementSynchro: null })
+    const lire = (colonnes: string) => client.from('preferences').select(colonnes).eq('user_id', utilisateur).maybeSingle()
+    ;(async () => {
+      let { data, error } = await lire('profil, vue, quartiers, annonces')
+      avecAnnonces.current = !(error && colonneAnnoncesAbsente(error.message))
+      if (!avecAnnonces.current) ({ data, error } = await lire('profil, vue, quartiers'))
+      if (annule) return
+      if (error) { useSession.setState({ synchro: 'erreur', erreurSynchro: error.message }); return }
+      const d = data as { profil?: unknown; vue?: string; quartiers?: unknown; annonces?: unknown } | null
+      if (d?.profil) useEtat.getState().majProfil(profilValide(d.profil))
+      if (d?.vue && VUE_INITIALE_VIDE) appliquerVue(decoder(d.vue))
+      if (d?.quartiers) useQuartiers.getState().fusionner(listeValide(d.quartiers))
+      if (d?.annonces) useAnnonces.getState().fusionner(annoncesValides(d.annonces))
+      if (!avecAnnonces.current) useSession.setState({ avertissementSynchro: SANS_COLONNE_ANNONCES })
+      charge.current = utilisateur
+      useSession.setState({ synchro: 'à jour' })
+      // Renvoie au compte ce que l'appareil apporte (profil d'un premier passage, listes fusionnées).
+      setRelu((n) => n + 1)
+    })()
     return () => { annule = true }
   }, [utilisateur, donneesPretes])
 
@@ -55,10 +70,11 @@ export function useSynchroCompte(): void {
     const client = supabase
     const minuteur = setTimeout(() => {
       useSession.setState({ synchro: 'en cours' })
-      client.from('preferences').upsert({ user_id: utilisateur, profil, vue, quartiers })
+      const ligne = { user_id: utilisateur, profil, vue, quartiers, ...(avecAnnonces.current ? { annonces } : {}) }
+      client.from('preferences').upsert(ligne)
         .then(({ error }) => useSession.setState(error
           ? { synchro: 'erreur', erreurSynchro: error.message } : { synchro: 'à jour', erreurSynchro: null }))
     }, DELAI_ENREGISTREMENT_MS)
     return () => clearTimeout(minuteur)
-  }, [utilisateur, profil, vue, quartiers, relu])
+  }, [utilisateur, profil, vue, quartiers, annonces, relu])
 }

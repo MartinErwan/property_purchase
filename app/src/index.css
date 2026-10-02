@@ -201,3 +201,43 @@ table.resultat th:first-child, table.resultat td:first-child { text-align: left;
   border-top: 1px dashed var(--rule); }
 .annonces .petit { flex-basis: 100%; margin: 0; }
 .annonces a.bouton { text-decoration: none; color: var(--ink); }
+
+/* ---------- Annonces enregistrées ---------- */
+.liste-annonces { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.annonce { display: grid; grid-template-columns: 76px 1fr; gap: 10px; padding: 8px; border: 1px solid var(--rule);
+  border-radius: 10px; background: var(--surface); }
+.annonce img, .annonce-sans-photo { width: 76px; height: 76px; border-radius: 6px; object-fit: cover; background: var(--page); }
+.annonce-sans-photo { display: grid; place-items: center; font-size: 26px; }
+.annonce-corps { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.annonce-titre { font-weight: 600; color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.annonce-titre:hover { text-decoration: underline; }
+.annonce-details { font-variant-numeric: tabular-nums; font-size: 13px; }
+.annonce-note { margin: 2px 0 0; font-size: 12px; white-space: pre-line; color: var(--ink-2); }
+.annonce-corps .tag { margin-left: 0; }
+.carte-quartier .actions { flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
+.carte-quartier .actions .bouton { white-space: nowrap; }
+.carte-quartier .actions .lien-danger { margin-left: auto; }
+.annonce-actions { display: flex; gap: 14px; margin-top: 2px; }
+.annonce-actions .lien-danger { margin: 0; }
+.tag-bon { background: #e3f4e6; color: #1d6b32; }
+.a-classer { margin-bottom: 14px; }
+.a-classer h3 { margin-top: 0; }
+
+.fenetre { border: 0; border-radius: 14px; padding: 0; width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+  box-shadow: var(--ombre); background: var(--surface); color: var(--ink); }
+.fenetre::backdrop { background: rgba(0, 0, 0, .35); }
+.formulaire-annonce { display: grid; gap: 10px; padding: 14px 16px 16px; }
+.formulaire-annonce header { display: flex; justify-content: space-between; align-items: center; }
+.formulaire-annonce h2 { font-size: 16px; margin: 0; }
+.formulaire-annonce label { display: grid; gap: 4px; font-size: 13px; color: var(--ink-2); }
+.formulaire-annonce input, .formulaire-annonce textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--rule);
+  border-radius: 8px; background: #fff; font: inherit; font-size: 16px; color: var(--ink); }
+.formulaire-annonce .trio { display: grid; grid-template-columns: 1.4fr 1fr .8fr; gap: 8px; }
+.formulaire-annonce .apercu { width: 100%; max-height: 180px; object-fit: cover; border-radius: 8px; }
+.formulaire-annonce .actions { margin-top: 4px; }
+.formulaire-annonce .bouton-principal:disabled { opacity: .5; }
+
+.aide-favori { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 10px; font-size: 13px; }
+.aide-favori summary { cursor: pointer; font-weight: 600; color: var(--accent-encre); }
+.aide-favori p { margin: 8px 0; }
+.aide-favori .favori { cursor: grab; text-decoration: none; color: var(--ink); }

@@ -29,6 +29,8 @@ Il faut d'abord avoir lancé le pipeline jusqu'au script 11 (voir le README à l
 | `src/etat.ts` | État de l'interface (zustand) ; seul le profil de financement est mémorisé sur l'appareil |
 | `src/quartiers.ts` | Quartiers enregistrés (mémorisés sur l'appareil, synchronisés avec le compte) |
 | `src/logique/annonces.ts` | Liens de recherche préremplis vers Leboncoin / SeLoger / Bien'ici (pas de scraping) |
+| `src/annonces.ts`, `src/logique/annonce.ts` | Annonces enregistrées : extraction de ce que reçoit `/ajout` (favori, partage Android), validation, fusion avec le compte, code du favori |
+| `src/entreeAnnonce.ts` | Lecture de `/ajout?…` au démarrage (avant la lecture de la vue), puis adresse remplacée par `/quartiers` |
 | `src/navigation.ts` | Pages et sous-onglets de la carte |
 
 ## Pages

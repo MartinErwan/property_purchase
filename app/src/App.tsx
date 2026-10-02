@@ -11,17 +11,27 @@ import { RECHERCHE_INITIALE } from './compte/retourConnexion'
 import { useSynchroCompte } from './compte/useSynchroCompte'
 import { useVentes } from './compte/useVentes'
 import { useVueEncodee } from './vue'
+import { useQuartiers } from './quartiers'
 import { useNavigation, type Page } from './navigation'
 import { FicheQuartier } from './panneaux/FicheQuartier'
 import { PageQuartiers } from './panneaux/PageQuartiers'
 import { PanneauCartographie } from './panneaux/PanneauCartographie'
 import { PanneauCompte } from './panneaux/PanneauCompte'
 import { PanneauFinancement } from './panneaux/PanneauFinancement'
+import { FormulaireAnnonce } from './panneaux/Annonces'
+import { useAnnonces } from './annonces'
+import { BROUILLON_INITIAL } from './entreeAnnonce'
 import { BarreOnglets } from './ui/onglets'
 import { ResumeFiltres } from './ui/ResumeFiltres'
 import { RechercheVille } from './ui/RechercheVille'
 import { Tiroir, type Hauteur } from './ui/Tiroir'
 import { useEcranLarge } from './ui/useEcranLarge'
+
+// Ouverture par le favori ou le partage (/ajout?…) : formulaire prérempli, rattaché au quartier affiché s'il est enregistré.
+if (BROUILLON_INITIAL) {
+  const iris = new URLSearchParams(window.location.search).get('iris')
+  useAnnonces.getState().ouvrir({ ...BROUILLON_INITIAL, iris: iris && useQuartiers.getState().estEnregistre(iris) ? iris : null })
+}
 
 /** Pages autres que la carte : plein écran sur mobile, dans le panneau latéral sur ordinateur. */
 const PAGES: Record<Exclude<Page, 'carte'>, { titre: string; Contenu: () => React.ReactElement }> = {
@@ -160,6 +170,7 @@ export default function App() {
               {charge(<PanneauCartographie />)}
             </Tiroir>
       )}
+      <FormulaireAnnonce />
       {!large && <BarreOnglets actif={page} surChoix={(p) => {
         if (p === 'carte' && page === 'carte') { if (tiroir.ouvert) setTiroir({ ...tiroir, ouvert: false }); else ouvrirReglages() }
         naviguer(p)

@@ -8,13 +8,15 @@ protègent les données. La clé `service_role` ne va **que** dans les secrets G
 
 | Objet | Rôle | Accès |
 |---|---|---|
-| table `preferences` | profil de financement (`profil`, jsonb), dernière vue de la carte (`vue`, paramètres d'URL) et quartiers enregistrés (`quartiers`, jsonb) | chaque utilisateur connecté lit / écrit / supprime **sa** ligne ; supprimée avec le compte |
+| table `preferences` | profil de financement (`profil`, jsonb), dernière vue de la carte (`vue`, paramètres d'URL) quartiers enregistrés (`quartiers`, jsonb) et annonces enregistrées (`annonces`, jsonb : lien, prix, surface, note, adresse de la photo d'origine) | chaque utilisateur connecté lit / écrit / supprime **sa** ligne ; supprimée avec le compte |
 | bucket `prive` | ventes DVF individuelles (`ventes_24m.<empreinte>.json`) | lecture : utilisateurs connectés ; écriture : pipeline (clé `service_role`) |
 
 ## Mise en place (une fois)
 
 1. **SQL Editor** → exécuter, dans l'ordre, chaque fichier de `migrations/` (coller → Run) :
-   `20260930000000_preferences_et_donnees_privees.sql` puis `20261002000000_quartiers_enregistres.sql`.
+   `20260930000000_preferences_et_donnees_privees.sql`, `20261002000000_quartiers_enregistres.sql`, puis
+   `20261003000000_annonces.sql` (sans elle, l'application synchronise tout sauf les annonces et le signale
+   dans l'onglet Compte).
    Les scripts sont idempotents : les relancer ne casse rien.
 2. **Authentication → Providers** :
    - *Email* : activé (confirmation de l'adresse conseillée) ;

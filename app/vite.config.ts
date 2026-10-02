@@ -64,6 +64,12 @@ export default defineConfig({
         display: 'standalone',
         background_color: '#f4f3ef',
         theme_color: '#1f5fae',
+        // Android (application installée) : « Partager » depuis une appli d'annonces → formulaire prérempli.
+        share_target: {
+          action: '/ajout',
+          method: 'GET',
+          params: { title: 'titre', text: 'texte', url: 'url' },
+        },
         icons: [
           { src: 'icone-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icone-512.png', sizes: '512x512', type: 'image/png' },

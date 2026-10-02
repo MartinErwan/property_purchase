@@ -14,6 +14,8 @@ import { centreGeometrie } from '../logique/annonces'
 import type { Budgets } from '../logique/financement'
 import type { Filtres } from '../logique/selection'
 import { LiensAnnonces } from './LiensAnnonces'
+import { nouvelleAnnonce, useAnnonces } from '../annonces'
+import { AideFavori, ListeAnnonces } from './Annonces'
 
 /** Page « Mes quartiers » : les quartiers enregistrés depuis leur fiche, triables, avec accès à la carte. */
 export function PageQuartiers() {
@@ -27,6 +29,7 @@ export function PageQuartiers() {
   const budgets = useBudgets()
   const [tri, setTri] = useState<Tri>('ajout')
   const large = useEcranLarge()
+  const annonces = useAnnonces((a) => a.annonces)
 
   const lignes = useMemo(() => {
     if (!donnees || versionTrajet < 0) return []
@@ -38,6 +41,8 @@ export function PageQuartiers() {
   }, [donnees, enregistres, versionTrajet])
   const tries = useMemo(() => trier(lignes, tri), [lignes, tri])
   const dest = libelleDestination(destination, meta?.poles)
+  const ids = new Set(enregistres.map((q) => q.id))
+  const aClasser = annonces.filter((a) => !a.iris || !ids.has(a.iris))
 
   const voir = (f: (typeof lignes)[number]['f']) => {
     useEtat.getState().set({ irisChoisi: f.properties.id })
@@ -46,8 +51,9 @@ export function PageQuartiers() {
     if (carte) centrerSurIris(carte, f)
   }
 
-  if (!enregistres.length) {
+  if (!enregistres.length && !annonces.length) {
     return (
+      <>
       <div className="vide">
         <p><b>Aucun quartier enregistré pour l'instant.</b></p>
         <p>Sur la carte, touche un quartier puis « ☆ Enregistrer » dans sa fiche : il apparaîtra ici, et sera
@@ -55,17 +61,25 @@ export function PageQuartiers() {
         <button type="button" className="bouton bouton-principal" onClick={() => useNavigation.getState().naviguer('carte')}>
           Aller à la carte</button>
       </div>
+      <AideFavori />
+      </>
     )
   }
 
   return (
     <>
-      <label className="tri">
+      {aClasser.length > 0 && (
+        <section className="a-classer">
+          <h3>Annonces à classer</h3>
+          <ListeAnnonces annonces={aClasser} median={null} />
+        </section>
+      )}
+      {lignes.length > 0 && <label className="tri">
         <span>Trier par</span>
         <select value={tri} onChange={(e) => setTri(e.target.value as Tri)}>
           {TRIS.map((t) => <option key={t.id} value={t.id}>{t.libelle}</option>)}
         </select>
-      </label>
+      </label>}
       <ul className="liste-quartiers">
         {tries.map(({ id, ajoute, f, p }) => (
           <li key={id} className="carte-quartier">
@@ -85,8 +99,10 @@ export function PageQuartiers() {
             </dl>
             <p className="discret petit">Station : {p.sa ?? '—'} à {fmt(p.da)} m · enregistré le {new Date(ajoute).toLocaleDateString('fr-FR')}</p>
             <LiensQuartier p={p} centre={centreGeometrie(f.geometry)} filtres={filtres} budgets={budgets} />
+            <ListeAnnonces annonces={annonces.filter((a) => a.iris === id)} median={p.pa} />
             <div className="actions">
               <button type="button" className="bouton bouton-petit" onClick={() => voir(f)}>Voir sur la carte</button>
+              <button type="button" className="bouton bouton-petit" onClick={() => nouvelleAnnonce(id)}>＋ Annonce</button>
               <button type="button" className="lien lien-danger" onClick={() => retirer(id)}>Retirer</button>
             </div>
           </li>
@@ -96,6 +112,7 @@ export function PageQuartiers() {
         <p className="note">{enregistres.length - lignes.length} quartier(s) enregistré(s) introuvable(s) dans les données
           actuelles (découpage IRIS modifié ?).</p>
       )}
+      <AideFavori />
     </>
   )
 }

@@ -8,10 +8,12 @@ interface EtatSession {
   pret: boolean
   synchro: 'inactive' | 'en cours' | 'à jour' | 'erreur'
   erreurSynchro: string | null
+  /** Problème partiel : le reste se synchronise (ex. migration des annonces pas encore exécutée). */
+  avertissementSynchro: string | null
 }
 
 export const useSession = create<EtatSession>()(() => ({
-  session: null, pret: !supabase, synchro: 'inactive', erreurSynchro: null,
+  session: null, pret: !supabase, synchro: 'inactive', erreurSynchro: null, avertissementSynchro: null,
 }))
 
 if (supabase) {
