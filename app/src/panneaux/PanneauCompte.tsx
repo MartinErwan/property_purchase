@@ -117,6 +117,7 @@ function Connecte() {
   const session = useSession((s) => s.session)!
   const synchro = useSession((s) => s.synchro)
   const erreur = useSession((s) => s.erreurSynchro)
+  const avertissement = useSession((s) => s.avertissementSynchro)
   const [confirmer, setConfirmer] = useState(false)
   const [info, setInfo] = useState<string | null>(null)
 
@@ -132,12 +133,13 @@ function Connecte() {
       <p className={`etat ${synchro === 'erreur' ? 'erreur' : 'discret'}`}>
         Synchronisation : {synchro === 'à jour' ? 'à jour ✓' : synchro === 'en cours' ? 'enregistrement…' : synchro === 'erreur' ? `erreur (${erreur})` : '—'}
       </p>
-      <p className="note">Sont enregistrés dans ton compte : ton profil de financement et ta dernière vue de la carte
-        (filtres, destination). Rien d'autre.</p>
+      {avertissement && <p className="etat erreur">{avertissement}</p>}
+      <p className="note">Sont enregistrés dans ton compte : ton profil de financement, ta dernière vue de la carte
+        (filtres, destination), tes quartiers et tes annonces enregistrés. Rien d'autre.</p>
       <button type="button" className="bouton" onClick={() => supabase!.auth.signOut()}>Se déconnecter</button>
       {!confirmer
         ? <button type="button" className="lien lien-danger" onClick={() => setConfirmer(true)}>Effacer mes données du compte</button>
-        : <p className="etat erreur">Effacer le profil et la vue enregistrés dans le compte ?{' '}
+        : <p className="etat erreur">Effacer le profil, la vue, les quartiers et les annonces enregistrés dans le compte ?{' '}
             <button type="button" className="lien lien-danger" onClick={effacer}>Oui, effacer</button>{' '}
             <button type="button" className="lien" onClick={() => setConfirmer(false)}>Annuler</button></p>}
       {info && <p className="etat discret">{info}</p>}

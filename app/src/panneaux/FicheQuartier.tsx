@@ -6,6 +6,7 @@ import { couleurDe, fmt, pct } from '../logique/echelles'
 import { NOM_ZONE } from '../logique/financement'
 import { estSelectionne, type IrisCalcule } from '../logique/selection'
 import { libelleDestination } from '../logique/trajet'
+import { useQuartiers } from '../quartiers'
 
 /** Fiche détaillée du quartier (IRIS) choisi sur la carte. */
 export function FicheQuartier({ id }: { id: string }) {
@@ -27,6 +28,7 @@ export function FicheQuartier({ id }: { id: string }) {
     <div className="fiche">
       <p className="fiche-commune">{p.nc} · {donnees?.manifeste.departements[p.dep] ?? p.dep}
         {dansFiltres ? <span className="tag">dans les filtres</span> : <span className="tag tag-neutre">hors filtres</span>}</p>
+      <BoutonEnregistrer id={p.id} />
 
       <div className="tuiles">
         <Tuile titre="Ancien" valeur={p.pa} unite="€/m²" ind="pa" detail={`${p.na} ventes${evol ? ` · ${evol}` : ''}`} />
@@ -64,5 +66,16 @@ function Tuile({ titre, valeur, unite, ind, detail }: { titre: string; valeur: n
         {valeur == null ? '—' : fmt(valeur)} <small>{valeur == null ? '' : unite}</small></span>
       <span className="tuile-detail">{detail}</span>
     </div>
+  )
+}
+
+function BoutonEnregistrer({ id }: { id: string }) {
+  const enregistre = useQuartiers((q) => q.enregistres.some((x) => x.id === id))
+  const basculer = useQuartiers((q) => q.basculer)
+  return (
+    <button type="button" className={`bouton bouton-enregistrer${enregistre ? ' actif' : ''}`} aria-pressed={enregistre}
+      onClick={() => basculer(id)}>
+      {enregistre ? '★ Enregistré dans « Mes quartiers »' : '☆ Enregistrer ce quartier'}
+    </button>
   )
 }

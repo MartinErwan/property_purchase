@@ -11,20 +11,33 @@ import { RECHERCHE_INITIALE } from './compte/retourConnexion'
 import { useSynchroCompte } from './compte/useSynchroCompte'
 import { useVentes } from './compte/useVentes'
 import { useVueEncodee } from './vue'
+import { useQuartiers } from './quartiers'
+import { useNavigation, type Page } from './navigation'
 import { FicheQuartier } from './panneaux/FicheQuartier'
-import { PanneauCarte } from './panneaux/PanneauCarte'
+import { PageQuartiers } from './panneaux/PageQuartiers'
+import { PanneauCartographie } from './panneaux/PanneauCartographie'
 import { PanneauCompte } from './panneaux/PanneauCompte'
-import { PanneauFiltres } from './panneaux/PanneauFiltres'
 import { PanneauFinancement } from './panneaux/PanneauFinancement'
-import { PanneauTrajet } from './panneaux/PanneauTrajet'
-import { ONGLETS, type Onglet } from './ui/definitionOnglets'
+import { FormulaireAnnonce } from './panneaux/Annonces'
+import { useAnnonces } from './annonces'
+import { BROUILLON_INITIAL } from './entreeAnnonce'
 import { BarreOnglets } from './ui/onglets'
+import { ResumeFiltres } from './ui/ResumeFiltres'
 import { RechercheVille } from './ui/RechercheVille'
 import { Tiroir, type Hauteur } from './ui/Tiroir'
 import { useEcranLarge } from './ui/useEcranLarge'
 
-const PANNEAUX: Record<Onglet, () => React.ReactElement> = {
-  carte: PanneauCarte, filtres: PanneauFiltres, financement: PanneauFinancement, trajet: PanneauTrajet, compte: PanneauCompte,
+// Ouverture par le favori ou le partage (/ajout?…) : formulaire prérempli, rattaché au quartier affiché s'il est enregistré.
+if (BROUILLON_INITIAL) {
+  const iris = new URLSearchParams(window.location.search).get('iris')
+  useAnnonces.getState().ouvrir({ ...BROUILLON_INITIAL, iris: iris && useQuartiers.getState().estEnregistre(iris) ? iris : null })
+}
+
+/** Pages autres que la carte : plein écran sur mobile, dans le panneau latéral sur ordinateur. */
+const PAGES: Record<Exclude<Page, 'carte'>, { titre: string; Contenu: () => React.ReactElement }> = {
+  quartiers: { titre: 'Mes quartiers', Contenu: PageQuartiers },
+  financement: { titre: 'Financement', Contenu: PanneauFinancement },
+  compte: { titre: 'Compte', Contenu: PanneauCompte },
 }
 
 /** Chargement des données au démarrage, puis de la matrice de l'horizon choisi à la demande. */
@@ -83,7 +96,8 @@ function useSynchroUrl(): void {
 
 export default function App() {
   const large = useEcranLarge()
-  const [onglet, setOnglet] = useState<Onglet>('filtres')
+  const page = useNavigation((n) => n.page)
+  const naviguer = useNavigation((n) => n.naviguer)
   const [tiroir, setTiroir] = useState<{ ouvert: boolean; hauteur: Hauteur }>({ ouvert: false, hauteur: 'mi' })
   const erreur = useRessources((r) => r.erreur)
   const donnees = useRessources((r) => r.donnees)
@@ -99,25 +113,16 @@ export default function App() {
 
   const surPrete = useCallback((c: CarteMapLibre) => useRessources.setState({ carte: c }), [])
 
-  // Mobile : ouvrir la fiche d'un quartier touché sur la carte.
+  // Mobile : ouvrir la fiche d'un quartier touché sur la carte (ou choisi dans « Mes quartiers »).
   const dernierIris = useRef<string | null>(null)
   useEffect(() => {
     if (irisChoisi && irisChoisi !== dernierIris.current && !large) setTiroir((t) => ({ ouvert: true, hauteur: t.ouvert ? t.hauteur : 'mi' }))
     dernierIris.current = irisChoisi
   }, [irisChoisi, large])
 
-  const choisirOnglet = (o: Onglet) => {
-    fermerFiche()
-    if (large) { setOnglet(o); return }
-    if (o === 'carte' && onglet === 'carte' && tiroir.ouvert) { setTiroir({ ...tiroir, ouvert: false }); return }
-    if (o === onglet && tiroir.ouvert) { setTiroir({ ...tiroir, ouvert: false }); return }
-    setOnglet(o)
-    setTiroir({ ouvert: true, hauteur: tiroir.ouvert ? tiroir.hauteur : 'mi' })
-  }
-
-  const Panneau = PANNEAUX[onglet]
-  const titre = ONGLETS.find((o) => o.id === onglet)!.libelle
-  const contenu = !donnees ? <Attente erreur={erreur} /> : <Panneau />
+  const ouvrirReglages = () => { fermerFiche(); setTiroir((t) => ({ ouvert: true, hauteur: t.ouvert ? t.hauteur : 'mi' })) }
+  const charge = (contenu: React.ReactElement) => (!donnees ? <Attente erreur={erreur} /> : contenu)
+  const pageCourante = page === 'carte' ? null : PAGES[page]
 
   return (
     <div className={`app ${large ? 'app-large' : 'app-mobile'}`}>
@@ -125,14 +130,20 @@ export default function App() {
         <aside className="panneau">
           <header className="panneau-entete">
             <h1>Où acheter en Île-de-France</h1>
-            <BarreOnglets actif={onglet} surChoix={choisirOnglet} />
+            <BarreOnglets actif={page} surChoix={naviguer} />
           </header>
-          <div className="panneau-contenu">{contenu}</div>
+          <div className="panneau-contenu">
+            {pageCourante && <h2 className="titre-page">{pageCourante.titre}</h2>}
+            {charge(pageCourante ? <pageCourante.Contenu /> : <PanneauCartographie />)}
+          </div>
         </aside>
       )}
       <main className="zone-carte">
         <Carte surPrete={surPrete} />
         <RechercheVille />
+        {!large && page === 'carte' && donnees && (
+          <ResumeFiltres surOuvrir={ouvrirReglages} />
+        )}
         <Infobulle survolActif={large} />
         {large && irisChoisi && (
           <aside className="fiche-flottante" aria-label={`Quartier ${nomIris ?? ''}`}>
@@ -141,19 +152,29 @@ export default function App() {
           </aside>
         )}
         {erreur && <div className="bandeau-erreur" role="alert">{erreur}</div>}
+        {!large && pageCourante && (
+          <section className="page-mobile" aria-label={pageCourante.titre}>
+            <h1 className="titre-page">{pageCourante.titre}</h1>
+            {charge(<pageCourante.Contenu />)}
+          </section>
+        )}
       </main>
-      {!large && tiroir.ouvert && (
+      {!large && page === 'carte' && tiroir.ouvert && (
         irisChoisi
           ? <Tiroir titre={nomIris ?? 'Quartier'} hauteur={tiroir.hauteur} surHauteur={(h) => setTiroir({ ouvert: true, hauteur: h })}
               surFermer={() => { fermerFiche(); setTiroir({ ...tiroir, ouvert: false }) }}>
               <FicheQuartier id={irisChoisi} />
             </Tiroir>
-          : <Tiroir titre={titre} hauteur={tiroir.hauteur} surHauteur={(h) => setTiroir({ ouvert: true, hauteur: h })}
+          : <Tiroir titre="Réglages de la carte" hauteur={tiroir.hauteur} surHauteur={(h) => setTiroir({ ouvert: true, hauteur: h })}
               surFermer={() => setTiroir({ ...tiroir, ouvert: false })}>
-              {contenu}
+              {charge(<PanneauCartographie />)}
             </Tiroir>
       )}
-      {!large && <BarreOnglets actif={tiroir.ouvert && !irisChoisi ? onglet : null} surChoix={choisirOnglet} />}
+      <FormulaireAnnonce />
+      {!large && <BarreOnglets actif={page} surChoix={(p) => {
+        if (p === 'carte' && page === 'carte') { if (tiroir.ouvert) setTiroir({ ...tiroir, ouvert: false }); else ouvrirReglages() }
+        naviguer(p)
+      }} />}
     </div>
   )
 }

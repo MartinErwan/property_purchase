@@ -120,6 +120,22 @@ Utilisateur : moi d'abord ; ouverture éventuelle à d'autres plus tard si l'out
 7. Supabase : connexion, sauvegarde du profil et des filtres, ventes DVF réservées aux connectés.
 8. GitHub Actions : pipeline planifié, contrôles qualité, déploiement ; tests du front sur PR.
 
+## Évolutions de l'application (après les jalons)
+- Fait : pages (Carte, Mes quartiers, Financement, Compte) avec adresses propres ; quartiers enregistrés
+  depuis la fiche, triables, soulignés sur la carte, synchronisés avec le compte.
+- Fait : depuis « Mes quartiers », liens de recherche préremplis vers les sites d'annonces (Leboncoin :
+  rayon de 1,5 km autour du quartier ; Bien'ici : commune ; SeLoger : commune, Paris et petite couronne
+  seulement, identifiants internes déduits d'une règle vérifiée sur 11 relevés), avec budget et surface des
+  réglages — PAS de scraping. Formats d'URL relevés sur des sources secondaires ; filtres Bien'ici `prix-max`/`surface-min` et
+  SeLoger `spaceMin` non vérifiés (`app/src/logique/annonces.ts`).
+- Fait : annonces enregistrées (lien, prix, surface, pièces, note, photo, quartier ; prix/m² comparé au médian
+  ancien du quartier), synchronisées avec le compte (`preferences.annonces`). Saisie préremplie par le favori
+  « ☆ Où acheter » (lit la page ouverte dans le navigateur de l'utilisateur : balises og:, JSON-LD, texte
+  visible), par le partage Android (`share_target` → `/ajout`) ou à la main. Règle : l'application ne
+  télécharge JAMAIS une page d'annonce (pas de robot serveur : CGU Leboncoin, anti-bot) et ne copie pas les
+  photos (adresse de l'image d'origine seulement). Extraction non testée sur les vrais sites (`app/src/logique/annonce.ts`).
+
 ## Hors périmètre pour l'instant
-Scraping d'annonces, prévision des taux, application native (stores), mode hors ligne, itinéraires
-en temps réel via API (Navitia/PRIM), favoris / comparateur / notes de visite (v2 possible).
+Scraping d'annonces (conditions d'utilisation des sites), prévision des taux, application native (stores),
+mode hors ligne, itinéraires en temps réel via API (Navitia/PRIM), aperçu automatique d'annonce côté serveur,
+comparateur (v2 possible).

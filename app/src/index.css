@@ -153,3 +153,91 @@ table.resultat th:first-child, table.resultat td:first-child { text-align: left;
 .lien { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; font: inherit; }
 .lien-danger { color: var(--erreur); display: inline-block; margin-top: 10px; }
 .bouton-google-officiel { display: flex; justify-content: center; min-height: 44px; margin: 6px 0; }
+
+/* ---------- Pages ---------- */
+.titre-page { font-size: 20px; margin: 12px 0 10px; }
+.page-mobile { position: absolute; inset: 0; z-index: 12; background: var(--surface); overflow-y: auto;
+  padding: 8px 16px calc(24px + var(--bas)); overscroll-behavior: contain; }
+.onglet-icone { position: relative; display: inline-flex; }
+.pastille-nb { position: absolute; top: -4px; right: -10px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px;
+  background: #f59f00; color: #fff; font-size: 10.5px; font-weight: 700; line-height: 17px; text-align: center; }
+
+/* Sous-onglets du panneau de la carte */
+.segments { display: flex; gap: 4px; background: var(--page); padding: 4px; border-radius: 10px; margin: 10px 0 6px; }
+.segments button { flex: 1; border: 0; background: none; padding: 7px 4px; border-radius: 7px; cursor: pointer; font-weight: 600;
+  color: var(--ink-2); }
+.segments button[aria-selected="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+
+/* Résumé des filtres sur la carte (mobile) */
+.resume-filtres { position: absolute; top: 60px; left: 10px; right: 52px; z-index: 6; display: flex; gap: 6px;
+  overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
+.resume-filtres::-webkit-scrollbar { display: none; }
+.pastille-filtre { flex: none; border: 1px solid var(--rule); background: #fff; border-radius: 16px; padding: 6px 11px;
+  font-size: 13px; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); cursor: pointer; white-space: nowrap; }
+.pastille-reglages { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 600; }
+.pastille-compte { background: var(--accent-fond); color: var(--accent-encre); border-color: transparent; font-weight: 600; cursor: default; }
+.app-mobile .maplibregl-ctrl-top-right { top: 100px; }
+
+/* Bouton Enregistrer de la fiche */
+.bouton-enregistrer { margin: 0 0 10px; }
+.bouton-enregistrer.actif { background: #fff4e0; border-color: #f59f00; color: #8a5300; }
+
+/* Page « Mes quartiers » */
+.vide { text-align: center; padding: 30px 10px; color: var(--ink-2); }
+.vide .bouton { width: auto; margin-top: 10px; }
+.tri { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px; margin: 4px 0 12px; font-size: 13px; }
+.liste-quartiers { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.carte-quartier { border: 1px solid var(--rule); border-radius: 12px; padding: 12px; background: #fff; }
+.carte-quartier-entete { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.carte-quartier-entete b { font-size: 15px; }
+.mesures { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin: 10px 0 6px; }
+.mesures dt { font-size: 11.5px; color: var(--ink-2); }
+.mesures dd { margin: 0; font-weight: 650; font-variant-numeric: tabular-nums; }
+.petit { font-size: 12px; margin: 4px 0; }
+.actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 6px; }
+.actions .lien-danger { margin: 0; }
+.bouton-petit { width: auto; padding: 7px 12px; margin: 0; }
+.annonces { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 8px 0 2px; padding-top: 8px;
+  border-top: 1px dashed var(--rule); }
+.annonces .petit { flex-basis: 100%; margin: 0; }
+.annonces a.bouton { text-decoration: none; color: var(--ink); }
+
+/* ---------- Annonces enregistrées ---------- */
+.liste-annonces { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.annonce { display: grid; grid-template-columns: 76px 1fr; gap: 10px; padding: 8px; border: 1px solid var(--rule);
+  border-radius: 10px; background: var(--surface); }
+.annonce img, .annonce-sans-photo { width: 76px; height: 76px; border-radius: 6px; object-fit: cover; background: var(--page); }
+.annonce-sans-photo { display: grid; place-items: center; font-size: 26px; }
+.annonce-corps { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+.annonce-titre { font-weight: 600; color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.annonce-titre:hover { text-decoration: underline; }
+.annonce-details { font-variant-numeric: tabular-nums; font-size: 13px; }
+.annonce-note { margin: 2px 0 0; font-size: 12px; white-space: pre-line; color: var(--ink-2); }
+.annonce-corps .tag { margin-left: 0; }
+.carte-quartier .actions { flex-wrap: wrap; justify-content: flex-start; gap: 8px; }
+.carte-quartier .actions .bouton { white-space: nowrap; }
+.carte-quartier .actions .lien-danger { margin-left: auto; }
+.annonce-actions { display: flex; gap: 14px; margin-top: 2px; }
+.annonce-actions .lien-danger { margin: 0; }
+.tag-bon { background: #e3f4e6; color: #1d6b32; }
+.a-classer { margin-bottom: 14px; }
+.a-classer h3 { margin-top: 0; }
+
+.fenetre { border: 0; border-radius: 14px; padding: 0; width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+  box-shadow: var(--ombre); background: var(--surface); color: var(--ink); }
+.fenetre::backdrop { background: rgba(0, 0, 0, .35); }
+.formulaire-annonce { display: grid; gap: 10px; padding: 14px 16px 16px; }
+.formulaire-annonce header { display: flex; justify-content: space-between; align-items: center; }
+.formulaire-annonce h2 { font-size: 16px; margin: 0; }
+.formulaire-annonce label { display: grid; gap: 4px; font-size: 13px; color: var(--ink-2); }
+.formulaire-annonce input, .formulaire-annonce textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--rule);
+  border-radius: 8px; background: #fff; font: inherit; font-size: 16px; color: var(--ink); }
+.formulaire-annonce .trio { display: grid; grid-template-columns: 1.4fr 1fr .8fr; gap: 8px; }
+.formulaire-annonce .apercu { width: 100%; max-height: 180px; object-fit: cover; border-radius: 8px; }
+.formulaire-annonce .actions { margin-top: 4px; }
+.formulaire-annonce .bouton-principal:disabled { opacity: .5; }
+
+.aide-favori { margin-top: 18px; border-top: 1px solid var(--rule); padding-top: 10px; font-size: 13px; }
+.aide-favori summary { cursor: pointer; font-weight: 600; color: var(--accent-encre); }
+.aide-favori p { margin: 8px 0; }
+.aide-favori .favori { cursor: grab; text-decoration: none; color: var(--ink); }
